@@ -357,8 +357,9 @@
     <property name="title">
      <string>File</string>
     </property>
-    <addaction name="actionOpen_Action"/>
-    <addaction name="actionOpen_Action_2"/>
+    <addaction name="actionNew_Action"/>
+    <addaction name="actionLoad_Action"/>
+    <addaction name="actionImport_Picture"/>
    </widget>
    <widget class="QMenu" name="menuSettings">
     <property name="title">
@@ -369,14 +370,19 @@
    <addaction name="menuSettings"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
-  <action name="actionOpen_Action">
+  <action name="actionNew_Action">
    <property name="text">
     <string>New Action</string>
    </property>
   </action>
-  <action name="actionOpen_Action_2">
+  <action name="actionLoad_Action">
    <property name="text">
-    <string>Open Action</string>
+    <string>Load Action</string>
+   </property>
+  </action>
+  <action name="actionImport_Picture">
+   <property name="text">
+    <string>Import Picture</string>
    </property>
   </action>
  </widget>

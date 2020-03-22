@@ -2,16 +2,21 @@ import sys
 
 from PySide2 import QtGui
 from PySide2.QtUiTools import QUiLoader
-from PySide2.QtWidgets import QApplication, QPushButton, QLineEdit, QTableWidget, QLabel, QTableWidgetItem
-from PySide2.QtCore import QFile, QObject, SIGNAL
+from PySide2.QtWidgets import QApplication, QPushButton, QLineEdit, QTableWidget, QLabel, QTableWidgetItem, QAction, \
+    QMenu
+from PySide2.QtCore import QFile, QObject, SIGNAL, QPoint
 
 
 class ActionWindow(QObject):
 
     def __init__(self, ui_file, parent=None):
 
+        self.DEFAULT_PICTURE = "actions/pictures/default.png"
+
         self.UP = 1
         self.DOWN = -1
+
+        self.isSaved = True
 
         super(ActionWindow, self).__init__(parent)
         ui_file = QFile(ui_file)
@@ -34,22 +39,20 @@ class ActionWindow(QObject):
         self.btn_edit = self.window.findChild(QPushButton, "btn_edit")
         self.btn_apply = self.window.findChild(QPushButton, "btn_apply")
 
-        picture_map = QtGui.QPixmap('icons\\test.png')
-        self.act_picture.setPixmap(picture_map)
+        self.menu_file = self.window.findChild(QMenu, 'menuFile').actions()
+        self.menu_new = self.menu.findChild(QAction, 'actionNew_Action')[0]
+        self.menu_load = self.menu.findChild(QAction, 'actionLoad_Action')[1]
+        self.menu_import_pic = self.menu.findChild(QAction, 'actionImport_Action')[2]
 
+        print (self.menu.actions())
         #btn_clear.clicked.connect(self.test)
         self.btn_add.clicked.connect(self.add_row)
         self.btn_remove.clicked.connect(self.remove_row)
         self.btn_up.clicked.connect(self.up_row)
         self.btn_down.clicked.connect(self.down_row)
 
-        self.btn_apply.clicked.connect(self.test)
-
-
+        self.btn_apply.clicked.connect(self.new_pic_action)
         self.window.show()
-
-    def test(self):
-        self.act_picture.setPixmap('icons\\plus.png')
 
     def add_row(self):
         self.tab_action.insertRow(self.tab_action.rowCount())
@@ -91,6 +94,18 @@ class ActionWindow(QObject):
         else:
             return
 
+    def new_pic_action(self):
+        self.tab_action.setRowCount(0)
+
+        self.act_picture.setPixmap(QtGui.QPixmap(self.DEFAULT_PICTURE))
+        return ActionPicture()
+
+
+class ActionPicture:
+    def __init__(self, name="default action", picture_url="actions/pictures/default.png", combination=[]):
+        self.a_name = name
+        self.pic_url = picture_url
+        self.comb = combination
 
 
 if __name__ == '__main__':
