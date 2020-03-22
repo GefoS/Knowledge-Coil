@@ -1,0 +1,6 @@
+<RCC>
+  <qresource prefix="ui_icons">
+    <file>plus.png</file>
+    <file>test.png</file>
+  </qresource>
+</RCC>

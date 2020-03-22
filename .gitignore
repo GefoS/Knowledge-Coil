@@ -1,0 +1,8 @@
+/build/
+/dist/
+/Main.exe
+/Main.spec
+/Test.py
+/csv_test.py
+/icons/*.png
+/actions/
