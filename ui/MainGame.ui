@@ -20,7 +20,7 @@
       <item>
        <layout class="QHBoxLayout" name="horizontalLayout">
         <item>
-         <widget class="QPushButton" name="ButRedo">
+         <widget class="QPushButton" name="btn_undo">
           <property name="minimumSize">
            <size>
             <width>100</width>
@@ -43,7 +43,7 @@
          </widget>
         </item>
         <item>
-         <widget class="QPushButton" name="ButClear">
+         <widget class="QPushButton" name="btn_clear">
           <property name="minimumSize">
            <size>
             <width>100</width>
@@ -66,7 +66,7 @@
          </widget>
         </item>
         <item>
-         <widget class="QPushButton" name="ButSkip">
+         <widget class="QPushButton" name="btn_skip">
           <property name="minimumSize">
            <size>
             <width>100</width>
@@ -120,7 +120,7 @@
        </spacer>
       </item>
       <item>
-       <widget class="QLabel" name="ImageHolder">
+       <widget class="QLabel" name="picture_holder">
         <property name="text">
          <string/>
         </property>
@@ -151,7 +151,7 @@
       <item>
        <layout class="QHBoxLayout" name="horizontalLayout_2">
         <item>
-         <widget class="QPlainTextEdit" name="Log">
+         <widget class="QPlainTextEdit" name="log">
           <property name="sizePolicy">
            <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
             <horstretch>0</horstretch>
@@ -174,7 +174,7 @@ D</string>
         <item>
          <layout class="QVBoxLayout" name="verticalLayout_2">
           <item>
-           <widget class="QLabel" name="Timer">
+           <widget class="QLabel" name="label_timer">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
               <horstretch>0</horstretch>

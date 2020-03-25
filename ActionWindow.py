@@ -9,7 +9,6 @@ from PySide2.QtCore import QFile, QObject
 import csv
 
 
-
 class ActionWindow(QObject):
 
     def __init__(self, ui_file, parent=None):
@@ -21,9 +20,7 @@ class ActionWindow(QObject):
         self.SHIFT_TO_CONTENT = 3
         self.PICTURE_ROW = 1
 
-        self.csv_path_global = 'actions/test.csv'
-        self.picture_action_global = ActionPicture()
-
+        self.csv_linked_path = ''
         self.isSaved = True
 
         super(ActionWindow, self).__init__(parent)
@@ -65,7 +62,7 @@ class ActionWindow(QObject):
         self.menu_load.triggered.connect(self.load)
         self.menu_import_pic.triggered.connect(self.import_picture)
         self.menu_save.triggered.connect(self.save_short)
-        self.menu_save.triggered.connect(self.save_full)
+        self.menu_save_as.triggered.connect(self.save_full)
         # self.act_picture.mousePressEvent = self.import_picture
         self.window.show()
 
@@ -83,24 +80,32 @@ class ActionWindow(QObject):
 
     def up_row(self):
         self.move_row(self.UP)
+        self.isSaved = False
 
     def down_row(self):
         self.move_row(self.DOWN)
+        self.isSaved = False
 
     def load(self):
-        csv_path = QFileDialog.getOpenFileName(None, "Load Picture Action", os.getcwd() + '\\actions',
-                                                    "CSV file (*.csv)")[0]
-        if csv_path is not '':
-            self.load_pic_action(csv_path)
-            self.csv_path_global = csv_path
+        if not self.isSaved:
+            ret_val = self.show_exit_save_dialog()
+            if ret_val == QMessageBox.Save:
+                self.save_short()
+                if self.isSaved:
+                    self.show_loading_act_dialog()
+            elif ret_val == QMessageBox.Ignore:
+                self.show_loading_act_dialog()
+        else:
+            self.show_loading_act_dialog()
 
     def save_short(self):
-        self.save_pic_action(False)
-        self.isSaved = True
+        if self.csv_linked_path:
+            self.save_pic_action(False)
+        else:
+            self.save_pic_action(True)
 
     def save_full(self):
         self.save_pic_action(True)
-        self.isSaved = True
 
     def move_row(self, direction):
         """model = self.tab_action.selectionModel()
@@ -131,6 +136,15 @@ class ActionWindow(QObject):
         else:
             return
 
+    def show_loading_act_dialog(self):
+        """csv_path = self.show_loading_act_dialog()
+        if csv_path:
+            self.load_pic_action(csv_path)"""
+        csv_path = QFileDialog.getOpenFileName(None, "Load Picture Action", os.getcwd() + '\\actions',
+                                                    "CSV file (*.csv)")[0]
+        if csv_path:
+            self.load_pic_action(csv_path)
+
     def show_exit_save_dialog(self):
         exit_save_dialog = QMessageBox()
         exit_save_dialog.setIcon(QMessageBox.Information)
@@ -155,47 +169,42 @@ class ActionWindow(QObject):
         return data
 
     def load_pic_action(self, csv_path):
-        def rebuild_and_parse():
-            data = []
-            with open(csv_path, newline='') as pic_file:
-                reader = csv.reader(pic_file, delimiter=',', quotechar='|')
-                data = list(reader)
-            self.tab_action.setRowCount(len(data) - self.SHIFT_TO_CONTENT)
-            for row in range(self.tab_action.rowCount()):
-                self.tab_action.setItem(row, 0, QTableWidgetItem(data[row + self.SHIFT_TO_CONTENT][0]))
-                self.tab_action.setItem(row, 1, QTableWidgetItem(data[row + self.SHIFT_TO_CONTENT][1]))
+        #def parse_and_rebuild():
+        data = []
+        with open(csv_path, newline='') as pic_file:
+            reader = csv.reader(pic_file, delimiter=',', quotechar='|')
+            data = list(reader)
+        self.tab_action.setRowCount(len(data) - self.SHIFT_TO_CONTENT)
+        for row in range(self.tab_action.rowCount()):
+            self.tab_action.setItem(row, 0, QTableWidgetItem(data[row + self.SHIFT_TO_CONTENT][0]))
+            self.tab_action.setItem(row, 1, QTableWidgetItem(data[row + self.SHIFT_TO_CONTENT][1]))
 
-            name = data[0][1]
-            pic_url = str(data[self.PICTURE_ROW][1])
-            self.act_picture.setPixmap(QtGui.QPixmap(pic_url))
-            self.le_name.setText(name)
+        name = data[0][1]
+        pic_url = str(data[self.PICTURE_ROW][1])
+        self.act_picture.setPixmap(QtGui.QPixmap(pic_url))
+        self.le_name.setText(name)
 
-            return data
+        self.isSaved = True
+        self.csv_linked_path = csv_path
 
-        if not self.isSaved:
+        """if not self.isSaved:
             ret_val = self.show_exit_save_dialog()
             if ret_val == QMessageBox.Save:
-                pass
+                self.save_short()
+                if self.isSaved:
+                    parse_and_rebuild()
             elif ret_val == QMessageBox.Ignore:
-                self.isSaved = True
-                re_data = rebuild_and_parse()
-
-                return ActionPicture(name=re_data[0][1], picture_url=str(re_data[self.PICTURE_ROW][1]),
-                                     csv_path=csv_path,
-                                     combination=re_data[self.SHIFT_TO_CONTENT:])
-
+                parse_and_rebuild()
         else:
-            self.isSaved = True
-            re_data = rebuild_and_parse()
-
-            return ActionPicture(name=re_data[0][1], picture_url=str(re_data[self.PICTURE_ROW][1]), csv_path=csv_path,
-                                 combination=re_data[self.SHIFT_TO_CONTENT:])
+            parse_and_rebuild()"""
 
     def new_pic_action(self):
         def refresh_space():
             self.tab_action.setRowCount(0)
             self.le_name.setText("default")
             self.act_picture.setPixmap(QtGui.QPixmap(self.DEFAULT_PICTURE))
+            self.csv_linked_path = ''
+            self.isSaved = True
 
         if self.isSaved:
             refresh_space()
@@ -206,38 +215,39 @@ class ActionWindow(QObject):
                 if self.isSaved:
                     refresh_space()
             elif res_val == QMessageBox.Ignore:
-                self.isSaved = True
                 refresh_space()
 
+    def write_files(self, path):
+        if path:
+            open(path, 'w').close()
+
+        pic_name = self.le_name.text()
+        pic_path = 'actions/pictures/' + pic_name + '.png'
+        with open(path, 'w', newline='') as csv_file:
+            csv_writer = csv.writer(csv_file, delimiter=',', quotechar='|')
+            # csv_writer.writerow (['name', self.picture_action_global.name])
+            # csv_writer.writerow (['pic_path', self.picture_action_global.picture_url])
+            csv_writer.writerow(['name', pic_name])
+            csv_writer.writerow(['pic_path', pic_path])
+            csv_writer.writerow(['Key', 'Command'])
+            for row in self.get_table_data():
+                csv_writer.writerow(row)
+            #csv_file.close()
+
+        #pic_file = open(pic_path, 'w')
+        self.act_picture.pixmap().save(pic_path, format='PNG')
+        #pic_file.close()
+
     def save_pic_action(self, isFull):
-        def write_files(path):
-            if isFull:
-                open(path, 'w').close()
-            pic_name = self.le_name.text()
-            pic_path = 'actions/pictures/'+pic_name+'.png'
-            with open(path, 'w', newline='') as csv_file:
-                csv_writer = csv.writer(csv_file, delimiter=',', quotechar='|')
-                # csv_writer.writerow (['name', self.picture_action_global.name])
-                # csv_writer.writerow (['pic_path', self.picture_action_global.picture_url])
-                csv_writer.writerow(['name', pic_name])
-                csv_writer.writerow(['pic_path', pic_path])
-                csv_writer.writerow(['Key', 'Command'])
-                for row in self.get_table_data():
-                    csv_writer.writerow(row)
-
-            pic_file = open(pic_path, 'w')
-            self.act_picture.pixmap().save(pic_path, format='PNG')
-
-        # self.picture_action_global.combination = self.get_table_data()
         if isFull:
             file_name = QFileDialog.getSaveFileName(None, "Save Picture Action", os.getcwd() + '\\actions',
-                                                    "CSV file (*.csv)")
-            if file_name[0] is not '':
-                self.csv_path_global = file_name[0]
-                write_files(self.csv_path_global)
+                                                    "CSV file (*.csv)")[0]
+            if file_name is not '':
+                self.csv_linked_path = file_name
+                self.write_files(self.csv_linked_path)
                 self.isSaved = True
         else:
-            write_files(self.csv_path_global)
+            self.write_files(self.csv_linked_path)
             self.isSaved = True
 
     def import_picture(self):
@@ -245,7 +255,7 @@ class ActionWindow(QObject):
                                                 "Image Files (*.png *.jpg *.bmp)")
         if file_name[0] is not '':
             self.act_picture.setPixmap(QtGui.QPixmap(file_name[0]))
-            self.picture_action_global.picture_url = file_name[0]
+            #self.picture_action_global.picture_url = file_name[0]
             self.isSaved = False
 
 
