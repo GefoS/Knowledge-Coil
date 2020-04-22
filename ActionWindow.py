@@ -1,24 +1,24 @@
 import sys
 import os
-
-from PySide2 import QtGui
-from PySide2.QtUiTools import QUiLoader
-from PySide2.QtWidgets import QApplication, QPushButton, QLineEdit, QTableWidget, QLabel, QTableWidgetItem, QAction, \
-    QMenu, QMessageBox, QFileDialog
-from PySide2.QtCore import QFile, QObject
 import csv
 
+from PySide2 import QtGui
+from PySide2 import QtXml
+from PySide2.QtUiTools import QUiLoader
+from PySide2.QtWidgets import QApplication, QPushButton, QLineEdit, QTableWidget, QLabel, QTableWidgetItem, \
+    QMenu, QMessageBox, QFileDialog, QWidget
+from PySide2.QtCore import QFile
 
-class ActionWindow(QObject):
+from global_params import CsvParams
+
+
+class ActionWindow(QWidget):
 
     def __init__(self, ui_file, parent=None):
 
         self.DEFAULT_PICTURE = "actions/pictures/default.png"
         self.UP = 1
         self.DOWN = -1
-
-        self.SHIFT_TO_CONTENT = 3
-        self.PICTURE_ROW = 1
 
         self.csv_linked_path = ''
         self.isSaved = True
@@ -69,8 +69,10 @@ class ActionWindow(QObject):
         self.tab_action.setRowCount(0)
         self.act_picture.setPixmap(QtGui.QPixmap(self.DEFAULT_PICTURE))
 
+
     def add_row(self):
         self.tab_action.insertRow(self.tab_action.rowCount())
+        self.game.window.show()
         self.isSaved = False
 
     def remove_row(self):
@@ -174,13 +176,14 @@ class ActionWindow(QObject):
         with open(csv_path, newline='') as pic_file:
             reader = csv.reader(pic_file, delimiter=',', quotechar='|')
             data = list(reader)
-        self.tab_action.setRowCount(len(data) - self.SHIFT_TO_CONTENT)
+        self.tab_action.setRowCount(len(data) - CsvParams.SHIFT_TO_CONTENT)
+        #CsvParams.SHIFT_TO_CONTENT
         for row in range(self.tab_action.rowCount()):
-            self.tab_action.setItem(row, 0, QTableWidgetItem(data[row + self.SHIFT_TO_CONTENT][0]))
-            self.tab_action.setItem(row, 1, QTableWidgetItem(data[row + self.SHIFT_TO_CONTENT][1]))
+            self.tab_action.setItem(row, 0, QTableWidgetItem(data[row + CsvParams.SHIFT_TO_CONTENT][0]))
+            self.tab_action.setItem(row, 1, QTableWidgetItem(data[row + CsvParams.SHIFT_TO_CONTENT][1]))
 
         name = data[0][1]
-        pic_url = str(data[self.PICTURE_ROW][1])
+        pic_url = str(data[CsvParams.PICTURE_ROW][1])
         self.act_picture.setPixmap(QtGui.QPixmap(pic_url))
         self.le_name.setText(name)
 
