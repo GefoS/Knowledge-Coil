@@ -143,44 +143,17 @@ class KeyHistory:
             print('our future: ', self.present_history)
 
 
-def key_to_modifier(key):
-    if Qt.Key(key) == Qt.Key_Control:
-        return Qt.CTRL
-    elif Qt.Key(key) == Qt.Key_Shift:
-        return Qt.SHIFT
-    else:
-        return Qt.ALT
-
-
-def form_sequence(key_set):
-    ''' key_sum = 0
-     for key in key_set:
-         key_sum += key
-     return QKeySequence(key_sum)'''
-    # key_set = [Qt.Key(key) for key in key_set]
-    if len(key_set) == 2:
-        return QKeySequence(key_to_modifier(key_set[0]) + key_set[1])
-    elif len(key_set) == 3:
-        return QKeySequence(key_to_modifier(key_set[0]) + key_to_modifier(key_set[1]) + key_set[2])
-
-
 class MainGame(QMainWindow):
 
     def __init__(self, ui_file, parent=None):
         self.GAME_TIME = -1
         self.remaining_time = 10000
 
-        '''self.modifiers_set = {
-            Qt.CTRL: Qt.CTRL,
-            Qt.SHIFT: Qt.SHIFT,
-            Qt.ALT: Qt.ALT,
-            Qt.CTRL | Qt.ALT: {Qt.CTRL, Qt.ALT},
-            Qt.CTRL | Qt.SHIFT: {Qt.CTRL, Qt.SHIFT},
-            Qt.SHIFT | Qt.ALT: {Qt.SHIFT, Qt.ALT},
-            Qt.CTRL | Qt.ALT | Qt.SHIFT: {Qt.CTRL, Qt.ALT, Qt.SHIFT}
-        }'''
+        # tuple of keys or set of tuples of keys!!!!
+        self.game_combination = []
 
         # PRESS-KEY -> ACTION
+        self.game_step = 0
         self.current_combination = {
             Qt.Key.Key_L: None,
             Qt.MouseButton.LeftButton: None,
@@ -188,9 +161,19 @@ class MainGame(QMainWindow):
             Qt.Key.Key_1: None,
             Qt.Key.Key_Return: None
         }
-        self.current_keys = list(self.current_combination.keys())
+        # self.game_combination=tuple(self.current_combination.keys())
+        self.game_combination = [
+            (
+                Qt.Key.Key_L, Qt.MouseButton.LeftButton, Qt.Key.Key_2, Qt.Key.Key_1, Qt.Key.Key_Return
+            ),
+            (
+                Qt.Key.Key_L, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.Key.Key_Return
+            ),
+            (
+                Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.Key.Key_2, Qt.Key.Key_1, Qt.Key.Key_Return
+            )
+        ]
         self.key_history = KeyHistory()
-        self.pressed = []
 
         super(MainGame, self).__init__(parent)
         ui_file = QFile(ui_file)
@@ -224,8 +207,6 @@ class MainGame(QMainWindow):
 
         self.window.installEventFilter(self)
 
-        # keyboard.add_hotkey('ctrl+z', self.isis)
-        print(Qt.Key(90))
         self.window.show()
 
     def check_modifier(self):
@@ -240,6 +221,8 @@ class MainGame(QMainWindow):
                     self.log.insertPlainText(KeyShortcuts.MOUSE_LEFT[1] + '\n')
                 else:
                     self.log.insertPlainText(KeyShortcuts.MOUSE_RIGHT[1] + '\n')
+                print (self.check_next_key(event.button()))
+                self.game_step += 1
                 self.key_history.draw(event.button())
 
             elif event.type() == QEvent.KeyPress and not event.isAutoRepeat():
@@ -267,23 +250,14 @@ class MainGame(QMainWindow):
                 if k_seq in KeyShortcuts.reserved_shortcuts:
                     return True
 
+                print(self.check_next_key(k_seq))
+                self.game_step += 1
+
                 log_row = k_seq.toString() + '\n'
                 self.log.insertPlainText(log_row)
             else:
                 return False
         return QMainWindow.eventFilter(self, obj, event)
-
-    def write_row(self, key):
-        if not isinstance(key, list):
-            self.log.insertPlainText(get_qt_key_name(key) + '\n')
-            self.key_history.draw(key)
-        else:
-            key_names = list(map(get_qt_key_name, key))
-            row_list = ['+'] * (len(key_names) * 2 - 1)
-            row_list[0::2] = key_names
-            row = ''.join(row_list)
-            self.log.insertPlainText(row + '\n')
-            self.key_history.draw(key.copy())
 
     def get_last_key(self):
         full_log = self.log.toPlainText().split('\n')
@@ -293,12 +267,30 @@ class MainGame(QMainWindow):
             return ''
 
     def undo_action(self):
+        self.game_step -= 1
         self.log.undo()
         self.key_history.undo()
 
     def redo_action(self):
+        self.game_step += 1
         self.log.redo()
         self.key_history.redo()
+
+    def check_next_key(self, key):
+        def check_in_tuple (tup, item, pos):
+            try:
+                return tup[pos] == item
+            except IndexError:
+                return False
+
+        if isinstance(self.game_combination, tuple):
+            return check_in_tuple(self.game_combination, key, self.game_step)
+        else:
+            for combination in self.game_combination:
+                if combination[self.game_step] == key:
+                    return True
+            return False
+
 
     def is_cursor_in_game_zone(self):
         pos = QtGui.QCursor.pos()

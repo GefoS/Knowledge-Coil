@@ -1,16 +1,11 @@
+from PySide2.QtCore import Qt
 from PySide2.QtGui import QKeySequence
 
 
 def main():
-    test = {
-        QKeySequence.New,
-        QKeySequence.Undo,
-        QKeySequence.Redo
-    }
-
-    for i in test:
-        print (i.)
-
+    seq = QKeySequence(90)
+    print (seq)
+    print (seq.)
 
 if __name__ == '__main__':
     main()
