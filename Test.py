@@ -1,19 +1,16 @@
-'''def hex_to_key(hex):
-    switcher = {
-        16777249: 'Control',
-        16777251: 'Alt',
-        16777248: "Shift"
-    }
-    if hex in switcher.keys():
-		return -1
-				else:
-	return -2
-'''
-
+from PySide2.QtGui import QKeySequence
 
 
 def main():
-    h = KeyHistory()
+    test = {
+        QKeySequence.New,
+        QKeySequence.Undo,
+        QKeySequence.Redo
+    }
+
+    for i in test:
+        print (i.)
+
 
 if __name__ == '__main__':
     main()

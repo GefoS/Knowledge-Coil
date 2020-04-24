@@ -8,7 +8,7 @@ from PySide2.QtUiTools import QUiLoader
 from PySide2.QtWidgets import QApplication, QPushButton, QLabel, QPlainTextEdit, QWidget, QMainWindow
 from PySide2.QtCore import QFile, QObject, QTimer, SIGNAL, QLine, QEvent, Qt
 
-from global_params import CsvParams, KeyShortcuts as key_shorts
+from global_params import CsvParams, KeyShortcuts as key_shorts, KeyShortcuts
 
 
 def form_timer_label(minute, second):
@@ -225,6 +225,7 @@ class MainGame(QMainWindow):
         self.window.installEventFilter(self)
 
         # keyboard.add_hotkey('ctrl+z', self.isis)
+        print(Qt.Key(90))
         self.window.show()
 
     def check_modifier(self):
@@ -236,12 +237,12 @@ class MainGame(QMainWindow):
         if obj == self.window:
             if event.type() == QEvent.MouseButtonPress and self.is_cursor_in_game_zone():
                 if event.button() == QtCore.Qt.MouseButton.LeftButton:
-                    self.log.insertPlainText(key_shorts.MOUSE_LEFT[1] + '\n')
+                    self.log.insertPlainText(KeyShortcuts.MOUSE_LEFT[1] + '\n')
                 else:
-                    self.log.insertPlainText(key_shorts.MOUSE_RIGHT[1] + '\n')
+                    self.log.insertPlainText(KeyShortcuts.MOUSE_RIGHT[1] + '\n')
                 self.key_history.draw(event.button())
 
-            elif event.type() == QEvent.KeyRelease and not event.isAutoRepeat():
+            elif event.type() == QEvent.KeyPress and not event.isAutoRepeat():
                 key = event.key()
 
                 if key == Qt.Key_unknown:
@@ -262,9 +263,12 @@ class MainGame(QMainWindow):
                     key += QtCore.Qt.META
 
                 k_seq = QKeySequence(key)
+
+                if k_seq in KeyShortcuts.reserved_shortcuts:
+                    return True
+
                 log_row = k_seq.toString() + '\n'
                 self.log.insertPlainText(log_row)
-
             else:
                 return False
         return QMainWindow.eventFilter(self, obj, event)
@@ -279,10 +283,14 @@ class MainGame(QMainWindow):
             row_list[0::2] = key_names
             row = ''.join(row_list)
             self.log.insertPlainText(row + '\n')
-            # a = QKeySequence()
-            # a.
-            # print(form_sequence(key).)
             self.key_history.draw(key.copy())
+
+    def get_last_key(self):
+        full_log = self.log.toPlainText().split('\n')
+        try:
+            return full_log[-2]
+        except IndexError:
+            return ''
 
     def undo_action(self):
         self.log.undo()
