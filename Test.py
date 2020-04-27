@@ -49,15 +49,13 @@ def parse_settings_xml(xml_path):
             key_map[key_value[0]] = key_value[1]
 
     filtered_map = {k : v for k, v in hex_to_sequence(key_map).items() if v}
-    for key, value in filtered_map.items():
-        print (key, value)
+    return filtered_map
 
 class Combination:
 
     def __init__(self, csv_path=None):
-        self.full_combination = tuple()
-        self.combination_sequence =dict()
-        self.commands = dict()
+        self.full_combination = list()
+        self.commands = list()
 
         self.name = 'name'
         self.picture_path = 'path'
@@ -70,46 +68,38 @@ class Combination:
             reader = csv.reader(action_file, delimiter=',', quotechar='|')
             data = list(reader)
 
-            iter_pos = 0
-            combination = list()
-            for keyboard_key, command in data[CsvParams.SHIFT_TO_CONTENT:]:
-                if command and command != 'None':
-                    self.commands[command] = iter_pos
+            self.name = data[CsvParams.NAME_ROW][1]
+            self.picture_path = data[CsvParams.PICTURE_ROW][1]
 
+            for keyboard_key, command in data[CsvParams.SHIFT_TO_CONTENT:]:
                 full_key = None
                 try:
                     full_key = QKeySequence(int(keyboard_key))
                 except ValueError:
-                    full_key = tuple(QKeySequence(ord(part_key)) for part_key in keyboard_key)
+                    full_key = tuple(QKeySequence(int(part_key)) for part_key in keyboard_key.split(':'))
 
-                combination.append(full_key)
-                iter_pos += 1
+                if command and command != 'None':
+                    self.commands.append(command)
+                else:
+                    self.commands.append(None)
 
-            self.full_combination = tuple(combination)
-            self.name = data[CsvParams.NAME_ROW][1]
-            self.picture_path = data[CsvParams.PICTURE_ROW][1]
+                self.full_combination.append(full_key)
 
-    def get_key_by_pos(self):
-        res = dict()
-        for k, v in self.commands.items():
-            res[k] = self.full_combination[v]
-        return res
-
-    def remap_keys(self, settings):
-
+    def remap_keys(self, settings=dict()):
+        id = 0
+        for command in self.commands:
+            if command:
+                new_key_action = settings.get(command, False)
+                if new_key_action:
+                    self.full_combination[id] = new_key_action
+            id += 1
 
 def main():
-    c = Combination('actions//test.csv')
+    c = Combination('actions//real_test.csv')
     print (c.full_combination)
     print (c.commands)
-    print (c.get_key_by_pos())
-    parse_settings_xml('levin.xml')
+    c.remap_keys(parse_settings_xml('levin.xml'))
+    print(c.full_combination)
 
 if __name__ == '__main__':
     main()
-
-'''
-AppPreviousViewCmd ['06', '00', '00', '00', '01', '00', '74', '00', 'b4', '60'] F5
-AppNextViewCmd     ['06', '00', '00', '00', '05', '00', '74', '00', '98', '60'] Shift+F5
-74 - 5
-'''
