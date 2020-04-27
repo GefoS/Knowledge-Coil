@@ -5,6 +5,7 @@ from PySide2.QtGui import QKeySequence
 class CsvParams:
     SHIFT_TO_CONTENT = 3
     PICTURE_ROW = 1
+    NAME_ROW = 0
 
 
 class KeyShortcuts:

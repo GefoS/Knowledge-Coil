@@ -69,10 +69,8 @@ class ActionWindow(QWidget):
         self.tab_action.setRowCount(0)
         self.act_picture.setPixmap(QtGui.QPixmap(self.DEFAULT_PICTURE))
 
-
     def add_row(self):
         self.tab_action.insertRow(self.tab_action.rowCount())
-        self.game.window.show()
         self.isSaved = False
 
     def remove_row(self):

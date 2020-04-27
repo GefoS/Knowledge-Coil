@@ -1,14 +1,13 @@
-import datetime, sys, csv
-import warnings
-from enum import Enum
+import sys, csv, datetime, warnings
+import xml.etree.ElementTree as et
 
 from PySide2 import QtXml, QtGui, QtCore
-from PySide2.QtGui import QKeyEvent, QKeySequence
+from PySide2.QtGui import QKeySequence
 from PySide2.QtUiTools import QUiLoader
-from PySide2.QtWidgets import QApplication, QPushButton, QLabel, QPlainTextEdit, QWidget, QMainWindow
+from PySide2.QtWidgets import QApplication, QPushButton, QLabel, QPlainTextEdit, QMainWindow
 from PySide2.QtCore import QFile, QObject, QTimer, SIGNAL, QLine, QEvent, Qt
 
-from global_params import CsvParams, KeyShortcuts as key_shorts, KeyShortcuts
+from global_params import CsvParams, KeyShortcuts
 
 
 def form_timer_label(minute, second):
@@ -24,61 +23,89 @@ def form_timer_label(minute, second):
         label += str(second)
     return label
 
+def hex_to_modifiers(hex_key):
+    tab = {
+        '09' : Qt.CTRL,
+        '11' : Qt.ALT,
+        '05' : Qt.SHIFT,
+        '0d' : Qt.CTRL + Qt.SHIFT,
+        '19' : Qt.CTRL + Qt.ALT,
+        '15' : Qt.ALT + Qt.SHIFT,
+        '01' : 0
+    }
+    return tab.get(hex_key, -1)
 
-def parse_to_qt_format(combination):
-    for key in combination:
-        if len(key) == 1:
-            return Qt.Key(ord(key))
-        elif '+' not in key:
-            return
+def hex_to_sequence(keys):
+    result = dict()
+    for key, value in keys.items():
+        if len(value) == 1:
+            result[key] = QKeySequence(value).toString()
+        elif value.startswith('hex'):
+            hex_keys = value[value.index(':')+1:]
+            hex_split = hex_keys.split(',')
+            full_key = hex_to_modifiers(hex_split[4])
+            if full_key != -1:
+                full_key += int(hex_split[6], 16)
+                hex_split = (QKeySequence(full_key).toString(), hex_split[6])
+            result[key] = hex_split
+    return result
 
 
-def get_full_key(pressed_keys):
-    if len(pressed_keys) == 1:
-        return pressed_keys[0]
-    elif len(pressed_keys) > 1:
-        return pressed_keys
-    else:
-        return -1
+def parse_settings_xml(xml_path):
+    tree = et.parse(xml_path)
+    root = tree.getroot()
+    key_leaf = [elem for elem in root[1].iter('Value')]
+    key_values = [key_value.text for key_value in key_leaf][1:]
+    key_values = list(map(lambda kv: kv.replace('"', ''), key_values))
 
+    key_map = dict()
+    for key_value in key_values:
+        key_value = key_value.split('=')
+        if len(key_value) == 2:
+            key_map[key_value[0]] = key_value[1]
 
-def get_qt_key_name(key):
-    return str(key).split('_')[-1]
+    filtered_map = {k : v for k, v in hex_to_sequence(key_map).items() if v}
+    for key, value in filtered_map.items():
+        print (key, value)
 
 
 class Combination:
-    def __init__(self, keys=None, values=None):
-        if keys is None:
-            self.keys = []
-        else:
-            self.keys = keys
-        if values is None:
-            self.values = []
-        else:
-            self.values = values
 
-    def load_csv_combination(self, path):
-        with open(path, newline='') as pic_file:
-            reader = csv.reader(pic_file, delimiter=',', quotechar='|')
+    def __init__(self, csv_path=None):
+        self.full_combination = dict()
+
+        self.name = 'name'
+        self.picture_path = 'path'
+
+        if csv_path:
+            self.parse_action(csv_path)
+
+    def parse_action(self, path):
+        with open(path, newline='') as action_file:
+            reader = csv.reader(action_file, delimiter=',', quotechar='|')
             data = list(reader)
 
-            for item in data[CsvParams.SHIFT_TO_CONTENT:]:
-                if item[1] == 'None':
-                    item[1] = None
-                self.insert(item[0], item[1])
+            csv_map = dict()
+            for keyboard_key, command in data[CsvParams.SHIFT_TO_CONTENT:]:
+                if not command or command == 'None':
+                    command = None
+                dict_key = None
+                try:
+                    dict_key = int(keyboard_key)
+                except ValueError:
+                    dict_key = keyboard_key
 
-    def insert(self, key, value=None):
-        self.keys.append(key)
-        self.values.append(value)
+                if isinstance(dict_key, str):
+                    complex_key = dict()
+                    for single_key in dict_key:
+                        complex_key[ord(single_key)] = command
+                    csv_map.update(complex_key)
+                else:
+                    csv_map[dict_key] = command
 
-    def is_right_key(self, key, position=0):
-        return self.keys[position] == key
-
-    def get_combination(self):
-        return self.keys, self.values
-
-    def get_keys(self):
-        return self.keys
+            self.full_combination = csv_map
+            self.name = data[CsvParams.NAME_ROW][1]
+            self.picture_path = data[CsvParams.PICTURE_ROW][1]
 
 
 class KeyHistory:
@@ -161,7 +188,7 @@ class MainGame(QMainWindow):
             Qt.Key.Key_1: None,
             Qt.Key.Key_Return: None
         }
-        # self.game_combination=tuple(self.current_combination.keys())
+
         self.game_combination = [
             (
                 Qt.Key.Key_L, Qt.MouseButton.LeftButton, Qt.Key.Key_2, Qt.Key.Key_1, Qt.Key.Key_Return
@@ -253,6 +280,7 @@ class MainGame(QMainWindow):
                 print(self.check_next_key(k_seq))
                 self.game_step += 1
 
+                print (key)
                 log_row = k_seq.toString() + '\n'
                 self.log.insertPlainText(log_row)
             else:
@@ -287,10 +315,16 @@ class MainGame(QMainWindow):
             return check_in_tuple(self.game_combination, key, self.game_step)
         else:
             for combination in self.game_combination:
-                if combination[self.game_step] == key:
-                    return True
+                try:
+                    if combination[self.game_step] == key:
+                        return True
+                except IndexError:
+                    return False
             return False
 
+    def refresh_game_zone(self):
+        self.game_step = 0
+        self.log.clear()
 
     def is_cursor_in_game_zone(self):
         pos = QtGui.QCursor.pos()
@@ -314,10 +348,6 @@ class MainGame(QMainWindow):
 
 
 def main():
-    c = Combination()
-    c.load_csv_combination('actions//action_line2.csv')
-    test = ['L', '122', '3', '1521', 'TAB', '228', '5', 'ML', 'EN']
-    # keyboard.add_hotkey('ctrl+z', lambda: print('я лох'))
     app = QApplication(sys.argv)
     main = MainGame('ui\MainGame.ui')
     sys.exit(app.exec_())
