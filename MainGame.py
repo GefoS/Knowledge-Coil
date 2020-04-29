@@ -10,6 +10,46 @@ from PySide2.QtCore import QFile, QObject, QTimer, SIGNAL, QLine, QEvent, Qt
 from global_params import CsvParams, KeyShortcuts
 
 
+def hook_mouse_event(event):
+    if event.button() == Qt.MouseButton.LeftButton:
+        return (KeyShortcuts.MOUSE_LEFT[1] + '\n')
+    elif event.button() == Qt.MouseButton.RightButton:
+        return (KeyShortcuts.MOUSE_RIGHT[1] + '\n')
+
+def invert_mouse_event(event):
+    if event.button() == Qt.MouseButton.LeftButton:
+        return KeyShortcuts.MOUSE_LEFT[2]
+    elif event.button() == Qt.MouseButton.RightButton:
+        return KeyShortcuts.MOUSE_RIGHT[2]
+
+def hook_key_event(event):
+    key = event.key()
+
+    if key == Qt.Key_unknown:
+        warnings.warn("Unknown key from a macro probably")
+        return True
+
+    if key in (Qt.Key_Shift, Qt.Key_Control, Qt.Key_Alt, Qt.Key_Meta):
+        return True
+
+    modifiers = event.modifiers()
+    if modifiers & QtCore.Qt.ShiftModifier:
+        key += QtCore.Qt.SHIFT
+    if modifiers & QtCore.Qt.ControlModifier:
+        key += QtCore.Qt.CTRL
+    if modifiers & QtCore.Qt.AltModifier:
+        key += QtCore.Qt.ALT
+    if modifiers & QtCore.Qt.MetaModifier:
+        key += QtCore.Qt.META
+
+    k_seq = QKeySequence(key)
+
+    if k_seq in KeyShortcuts.reserved_shortcuts:
+        return True
+
+    return k_seq
+
+
 def form_timer_label(minute, second):
     label = ''
     if minute < 10:
@@ -39,15 +79,17 @@ def hex_to_sequence(keys):
     result = dict()
     for key, value in keys.items():
         if len(value) == 1:
-            result[key] = QKeySequence(value).toString()
+            result[key] = QKeySequence(value)
         elif value.startswith('hex'):
             hex_keys = value[value.index(':')+1:]
             hex_split = hex_keys.split(',')
             full_key = hex_to_modifiers(hex_split[4])
             if full_key != -1:
                 full_key += int(hex_split[6], 16)
-                hex_split = (QKeySequence(full_key).toString(), hex_split[6])
+                hex_split = QKeySequence(full_key)
             result[key] = hex_split
+        else:
+            result[key] = tuple(QKeySequence(ord(key)) for key in value)
     return result
 
 
@@ -65,14 +107,13 @@ def parse_settings_xml(xml_path):
             key_map[key_value[0]] = key_value[1]
 
     filtered_map = {k : v for k, v in hex_to_sequence(key_map).items() if v}
-    for key, value in filtered_map.items():
-        print (key, value)
-
+    return filtered_map
 
 class Combination:
 
     def __init__(self, csv_path=None):
-        self.full_combination = dict()
+        self.full_combination = list()
+        self.commands = list()
 
         self.name = 'name'
         self.picture_path = 'path'
@@ -85,28 +126,31 @@ class Combination:
             reader = csv.reader(action_file, delimiter=',', quotechar='|')
             data = list(reader)
 
-            csv_map = dict()
-            for keyboard_key, command in data[CsvParams.SHIFT_TO_CONTENT:]:
-                if not command or command == 'None':
-                    command = None
-                dict_key = None
-                try:
-                    dict_key = int(keyboard_key)
-                except ValueError:
-                    dict_key = keyboard_key
-
-                if isinstance(dict_key, str):
-                    complex_key = dict()
-                    for single_key in dict_key:
-                        complex_key[ord(single_key)] = command
-                    csv_map.update(complex_key)
-                else:
-                    csv_map[dict_key] = command
-
-            self.full_combination = csv_map
             self.name = data[CsvParams.NAME_ROW][1]
             self.picture_path = data[CsvParams.PICTURE_ROW][1]
 
+            for keyboard_key, command in data[CsvParams.SHIFT_TO_CONTENT:]:
+                full_key = None
+                try:
+                    full_key = QKeySequence(int(keyboard_key))
+                except ValueError:
+                    full_key = tuple(QKeySequence(int(part_key)) for part_key in keyboard_key.split(':'))
+
+                if command and command != 'None':
+                    self.commands.append(command)
+                else:
+                    self.commands.append(None)
+
+                self.full_combination.append(full_key)
+
+    def remap_keys(self, settings=dict()):
+        id = 0
+        for command in self.commands:
+            if command:
+                new_key_action = settings.get(command, False)
+                if new_key_action:
+                    self.full_combination[id] = new_key_action
+            id += 1
 
 class KeyHistory:
     def __init__(self):
@@ -244,43 +288,16 @@ class MainGame(QMainWindow):
     def eventFilter(self, obj, event):
         if obj == self.window:
             if event.type() == QEvent.MouseButtonPress and self.is_cursor_in_game_zone():
-                if event.button() == QtCore.Qt.MouseButton.LeftButton:
-                    self.log.insertPlainText(KeyShortcuts.MOUSE_LEFT[1] + '\n')
-                else:
-                    self.log.insertPlainText(KeyShortcuts.MOUSE_RIGHT[1] + '\n')
-                print (self.check_next_key(event.button()))
+                self.log.insertPlainText(hook_mouse_event(event))
                 self.game_step += 1
                 self.key_history.draw(event.button())
 
             elif event.type() == QEvent.KeyPress and not event.isAutoRepeat():
-                key = event.key()
-
-                if key == Qt.Key_unknown:
-                    warnings.warn("Unknown key from a macro probably")
+                k_seq = hook_key_event(event)
+                if k_seq == True:
                     return True
 
-                if key in (Qt.Key_Shift, Qt.Key_Control, Qt.Key_Alt, Qt.Key_Meta):
-                    return True
-
-                modifiers = event.modifiers()
-                if modifiers & QtCore.Qt.ShiftModifier:
-                    key += QtCore.Qt.SHIFT
-                if modifiers & QtCore.Qt.ControlModifier:
-                    key += QtCore.Qt.CTRL
-                if modifiers & QtCore.Qt.AltModifier:
-                    key += QtCore.Qt.ALT
-                if modifiers & QtCore.Qt.MetaModifier:
-                    key += QtCore.Qt.META
-
-                k_seq = QKeySequence(key)
-
-                if k_seq in KeyShortcuts.reserved_shortcuts:
-                    return True
-
-                print(self.check_next_key(k_seq))
                 self.game_step += 1
-
-                print (key)
                 log_row = k_seq.toString() + '\n'
                 self.log.insertPlainText(log_row)
             else:

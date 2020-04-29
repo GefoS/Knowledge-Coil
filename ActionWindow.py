@@ -2,14 +2,16 @@ import sys
 import os
 import csv
 
+import PySide2
 from PySide2 import QtGui
 from PySide2 import QtXml
 from PySide2.QtUiTools import QUiLoader
 from PySide2.QtWidgets import QApplication, QPushButton, QLineEdit, QTableWidget, QLabel, QTableWidgetItem, \
-    QMenu, QMessageBox, QFileDialog, QWidget
-from PySide2.QtCore import QFile
+    QMenu, QMessageBox, QFileDialog, QWidget, QRadioButton
+from PySide2.QtCore import QFile, QEvent
 
 from global_params import CsvParams
+import MainGame
 
 
 class ActionWindow(QWidget):
@@ -21,7 +23,10 @@ class ActionWindow(QWidget):
         self.DOWN = -1
 
         self.csv_linked_path = ''
-        self.isSaved = True
+        self.is_saved = True
+        self.is_recording = False
+        # add -> false, rewrite -> true
+        self.is_rewriting_mode = False
 
         super(ActionWindow, self).__init__(parent)
         ui_file = QFile(ui_file)
@@ -33,16 +38,26 @@ class ActionWindow(QWidget):
 
         # tab
         self.tab_action = self.window.findChild(QTableWidget, "tab_action")
+        self.tab = QTableWidget
+        #self.tab.setSp
+
         self.btn_add = self.window.findChild(QPushButton, "btn_add")
         self.btn_down = self.window.findChild(QPushButton, "btn_down")
         self.btn_up = self.window.findChild(QPushButton, "btn_up")
         self.btn_remove = self.window.findChild(QPushButton, "btn_remove")
+        self.btn_merge = self.window.findChild(QPushButton, "btn_merge")
+        self.btn_split = self.window.findChild(QPushButton, "btn_split")
+
+        self.btn_edit = self.window.findChild(QPushButton, "btn_edit")
+        self.btn_apply = self.window.findChild(QPushButton, "btn_apply")
+        self.btn_record = self.window.findChild(QPushButton, "btn_record")
 
         # img
         self.act_picture = self.window.findChild(QLabel, "img_action")
         self.le_name = self.window.findChild(QLineEdit, "le_name")
-        self.btn_edit = self.window.findChild(QPushButton, "btn_edit")
-        self.btn_apply = self.window.findChild(QPushButton, "btn_apply")
+
+        self.rbtn_add: QRadioButton = self.window.findChild(QRadioButton, "rbtn_add")
+        self.rbtn_rewrite: QRadioButton = self.window.findChild(QRadioButton, "rbtn_rewrite")
 
         self.menu_file = self.window.findChild(QMenu, 'menuFile').actions()
         self.menu_new = self.menu_file[0]
@@ -50,48 +65,96 @@ class ActionWindow(QWidget):
         self.menu_save = self.menu_file[2]
         self.menu_save_as = self.menu_file[3]
         self.menu_import_pic = self.menu_file[5]
+        self.menu_settings = self.window.findChild(QMenu, 'menuSettings').actions()[0]
 
-        # btn_clear.clicked.connect(self.test)
         self.btn_add.clicked.connect(self.add_row)
         self.btn_remove.clicked.connect(self.remove_row)
         self.btn_up.clicked.connect(self.up_row)
         self.btn_down.clicked.connect(self.down_row)
+        self.btn_merge.clicked.connect(self.merge_row)
+        self.btn_split.clicked.connect(self.split_row)
+        self.btn_record.clicked.connect(self.toggle_recording)
         # self.btn_apply.clicked.connect(self.import_picture)
+
+        self.rbtn_add.clicked.connect(self.check_add_mode)
+        self.rbtn_rewrite.clicked.connect(self.check_rewrite_mode)
 
         self.menu_new.triggered.connect(self.new_pic_action)
         self.menu_load.triggered.connect(self.load)
         self.menu_import_pic.triggered.connect(self.import_picture)
         self.menu_save.triggered.connect(self.save_short)
         self.menu_save_as.triggered.connect(self.save_full)
-        # self.act_picture.mousePressEvent = self.import_picture
+        # self.menu_settings.triggered.connect(self.test)
+
+        self.window.installEventFilter(self)
         self.window.show()
 
         self.tab_action.setRowCount(0)
         self.act_picture.setPixmap(QtGui.QPixmap(self.DEFAULT_PICTURE))
 
+    def eventFilter(self, obj, event: QEvent):
+        if obj == self.window and self.is_recording:
+            if event.type() == QEvent.MouseButtonPress:
+                self.write_to_table(MainGame.invert_mouse_event(event))
+            elif event.type() == QEvent.KeyPress and not event.isAutoRepeat():
+                key_seq = MainGame.hook_key_event(event)
+                if key_seq == True:
+                    return True
+                self.write_to_table(key_seq.toString())
+            else:
+                return False
+        return QWidget.eventFilter(self, obj, event)
+
+    def write_to_table(self, data):
+        print(data)
+
+    def toggle_recording(self):
+        if self.is_recording and self.rbtn_rewrite.isChecked():
+            self.rbtn_add.setChecked(True)
+            self.rbtn_add.setChecked(False)
+        self.is_recording = not self.is_recording
+
     def add_row(self):
         self.tab_action.insertRow(self.tab_action.rowCount())
-        self.isSaved = False
+        self.is_saved = False
 
     def remove_row(self):
         sel_row = self.tab_action.currentRow()
         self.tab_action.removeRow(sel_row)
-        self.isSaved = False
+        self.is_saved = False
 
     def up_row(self):
         self.move_row(self.UP)
-        self.isSaved = False
+        self.is_saved = False
 
     def down_row(self):
         self.move_row(self.DOWN)
-        self.isSaved = False
+        self.is_saved = False
+
+    def merge_row(self):
+        model = self.tab_action.model()
+        selected_rows = list(set([id.row() for id in self.tab_action.selectedIndexes()]))
+
+        data = ''
+        for row in selected_rows:
+            id = model.index(row, 0)
+            data += (str(model.data(id)))
+
+        first_cell_row = selected_rows[0]
+        self.tab_action.setItem(first_cell_row, 0, QTableWidgetItem(data))
+
+        for row in range(1, len(selected_rows)):
+            self.tab_action.removeRow(first_cell_row+1)
+
+    def split_row(self):
+        print (MainGame.hex_to_modifiers('09'))
 
     def load(self):
-        if not self.isSaved:
+        if not self.is_saved:
             ret_val = self.show_exit_save_dialog()
             if ret_val == QMessageBox.Save:
                 self.save_short()
-                if self.isSaved:
+                if self.is_saved:
                     self.show_loading_act_dialog()
             elif ret_val == QMessageBox.Ignore:
                 self.show_loading_act_dialog()
@@ -106,6 +169,19 @@ class ActionWindow(QWidget):
 
     def save_full(self):
         self.save_pic_action(True)
+
+    def check_add_mode(self):
+        self.change_mode('add')
+
+    def check_rewrite_mode(self):
+        self.change_mode('rewrite')
+
+    def change_mode(self, button):
+        if button == 'add':
+            self.is_rewriting_mode = False
+        elif button == 'rewrite' and not self.is_rewriting_mode:
+            print('погнали')
+            self.is_rewriting_mode = True
 
     def move_row(self, direction):
         """model = self.tab_action.selectionModel()
@@ -125,14 +201,14 @@ class ActionWindow(QWidget):
             self.tab_action.setItem(row_id - 1, 1, QTableWidgetItem(com_cell))
             self.tab_action.removeRow(row_id + 1)
             self.tab_action.setCurrentCell(row_id - 1, col_id)
-            self.isSaved = False
+            self.is_saved = False
         elif direction == self.DOWN and row_id != self.tab_action.rowCount() - 1:
             self.tab_action.insertRow(row_id + 2)
             self.tab_action.setItem(row_id + 2, 0, QTableWidgetItem(key_cell))
             self.tab_action.setItem(row_id + 2, 1, QTableWidgetItem(com_cell))
             self.tab_action.removeRow(row_id)
             self.tab_action.setCurrentCell(row_id + 1, col_id)
-            self.isSaved = False
+            self.is_saved = False
         else:
             return
 
@@ -185,7 +261,7 @@ class ActionWindow(QWidget):
         self.act_picture.setPixmap(QtGui.QPixmap(pic_url))
         self.le_name.setText(name)
 
-        self.isSaved = True
+        self.is_saved = True
         self.csv_linked_path = csv_path
 
         """if not self.isSaved:
@@ -205,15 +281,15 @@ class ActionWindow(QWidget):
             self.le_name.setText("default")
             self.act_picture.setPixmap(QtGui.QPixmap(self.DEFAULT_PICTURE))
             self.csv_linked_path = ''
-            self.isSaved = True
+            self.is_saved = True
 
-        if self.isSaved:
+        if self.is_saved:
             refresh_space()
         else:
             res_val = self.show_exit_save_dialog()
             if res_val == QMessageBox.Save:
                 self.save_short()
-                if self.isSaved:
+                if self.is_saved:
                     refresh_space()
             elif res_val == QMessageBox.Ignore:
                 refresh_space()
@@ -246,10 +322,10 @@ class ActionWindow(QWidget):
             if file_name is not '':
                 self.csv_linked_path = file_name
                 self.write_files(self.csv_linked_path)
-                self.isSaved = True
+                self.is_saved = True
         else:
             self.write_files(self.csv_linked_path)
-            self.isSaved = True
+            self.is_saved = True
 
     def import_picture(self):
         file_name = QFileDialog.getOpenFileName(None, "Open Image", os.getcwd() + '\\actions\\pictures',
@@ -257,7 +333,7 @@ class ActionWindow(QWidget):
         if file_name[0] is not '':
             self.act_picture.setPixmap(QtGui.QPixmap(file_name[0]))
             #self.picture_action_global.picture_url = file_name[0]
-            self.isSaved = False
+            self.is_saved = False
 
 
 class ActionPicture:
