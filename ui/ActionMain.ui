@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>909</width>
+    <width>930</width>
     <height>611</height>
    </rect>
   </property>
@@ -558,7 +558,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>909</width>
+     <width>930</width>
      <height>21</height>
     </rect>
    </property>
@@ -628,12 +628,12 @@
     <string>Load Key Settings</string>
    </property>
   </action>
-  <action name="actionactionStartRecord">
+  <action name="act_record">
    <property name="text">
     <string>actiontRecord</string>
    </property>
    <property name="shortcut">
-    <string>Space</string>
+    <string>Ctrl+R</string>
    </property>
   </action>
  </widget>

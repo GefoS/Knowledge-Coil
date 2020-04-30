@@ -3,15 +3,27 @@ import os
 import csv
 
 import PySide2
-from PySide2 import QtGui
+from PySide2 import QtGui, QtWidgets
 from PySide2 import QtXml
+from PySide2.QtGui import QKeySequence
 from PySide2.QtUiTools import QUiLoader
 from PySide2.QtWidgets import QApplication, QPushButton, QLineEdit, QTableWidget, QLabel, QTableWidgetItem, \
-    QMenu, QMessageBox, QFileDialog, QWidget, QRadioButton
-from PySide2.QtCore import QFile, QEvent
+    QMenu, QMessageBox, QFileDialog, QWidget, QRadioButton, QAction
+from PySide2.QtCore import QFile, QEvent, Qt
 
-from global_params import CsvParams
+from global_params import CsvParams, KeyShortcuts
 import MainGame
+
+
+def invert_table_key(tab_key):
+    if len(tab_key) == 1:
+        return QKeySequence(tab_key)
+    if tab_key in (KeyShortcuts.MOUSE_RIGHT[2], KeyShortcuts.MOUSE_LEFT[2]):
+        return tab_key
+    for modifier in ('Ctrl', 'Shift', 'Alt'):
+        if modifier in tab_key:
+            return QKeySequence(tab_key)
+    return [QKeySequence(minor_key) for minor_key in tab_key]
 
 
 class ActionWindow(QWidget):
@@ -37,20 +49,18 @@ class ActionWindow(QWidget):
         ui_file.close()
 
         # tab
-        self.tab_action = self.window.findChild(QTableWidget, "tab_action")
-        self.tab = QTableWidget
-        #self.tab.setSp
+        self.tab_action:QTableWidget = self.window.findChild(QTableWidget, "tab_action")
 
         self.btn_add = self.window.findChild(QPushButton, "btn_add")
         self.btn_down = self.window.findChild(QPushButton, "btn_down")
         self.btn_up = self.window.findChild(QPushButton, "btn_up")
         self.btn_remove = self.window.findChild(QPushButton, "btn_remove")
-        self.btn_merge = self.window.findChild(QPushButton, "btn_merge")
-        self.btn_split = self.window.findChild(QPushButton, "btn_split")
+        self.btn_merge:QPushButton = self.window.findChild(QPushButton, "btn_merge")
+        self.btn_split:QPushButton = self.window.findChild(QPushButton, "btn_split")
 
         self.btn_edit = self.window.findChild(QPushButton, "btn_edit")
         self.btn_apply = self.window.findChild(QPushButton, "btn_apply")
-        self.btn_record = self.window.findChild(QPushButton, "btn_record")
+        self.btn_record:QPushButton = self.window.findChild(QPushButton, "btn_record")
 
         # img
         self.act_picture = self.window.findChild(QLabel, "img_action")
@@ -66,6 +76,7 @@ class ActionWindow(QWidget):
         self.menu_save_as = self.menu_file[3]
         self.menu_import_pic = self.menu_file[5]
         self.menu_settings = self.window.findChild(QMenu, 'menuSettings').actions()[0]
+        self.sc_record: QtWidgets.QShortcut = QtWidgets.QShortcut(QKeySequence('Ctrl+R'), self.btn_record)
 
         self.btn_add.clicked.connect(self.add_row)
         self.btn_remove.clicked.connect(self.remove_row)
@@ -74,7 +85,6 @@ class ActionWindow(QWidget):
         self.btn_merge.clicked.connect(self.merge_row)
         self.btn_split.clicked.connect(self.split_row)
         self.btn_record.clicked.connect(self.toggle_recording)
-        # self.btn_apply.clicked.connect(self.import_picture)
 
         self.rbtn_add.clicked.connect(self.check_add_mode)
         self.rbtn_rewrite.clicked.connect(self.check_rewrite_mode)
@@ -84,8 +94,11 @@ class ActionWindow(QWidget):
         self.menu_import_pic.triggered.connect(self.import_picture)
         self.menu_save.triggered.connect(self.save_short)
         self.menu_save_as.triggered.connect(self.save_full)
+        #self.act_record.triggered.connect(lambda: print('11'))
+        #print (self.act_record)
         # self.menu_settings.triggered.connect(self.test)
 
+        self.rbtn_add.setChecked(True)
         self.window.installEventFilter(self)
         self.window.show()
 
@@ -101,21 +114,40 @@ class ActionWindow(QWidget):
                 if key_seq == True:
                     return True
                 self.write_to_table(key_seq.toString())
+            elif event.type() == QEvent.KeyRelease and event.key() == Qt.Key_Tab:
+                self.write_to_table(QKeySequence(Qt.Key_Tab))
             else:
                 return False
-        return QWidget.eventFilter(self, obj, event)
+        try:
+            return QWidget.eventFilter(self, obj, event)
+        except RuntimeError:
+            return True
 
     def write_to_table(self, data):
-        print(data)
-
-    def toggle_recording(self):
-        if self.is_recording and self.rbtn_rewrite.isChecked():
+        if self.is_rewriting_mode:
             self.rbtn_add.setChecked(True)
             self.rbtn_add.setChecked(False)
+            self.is_rewriting_mode = False
+
+        self.add_row()
+        self.tab_action.rowCount()
+        self.tab_action.setItem(self.tab_action.rowCount()-1, 0, QTableWidgetItem(data))
+
+    def toggle_recording(self):
+        name_state = {
+            True: 'Stop',
+            False: 'Start'
+        }
         self.is_recording = not self.is_recording
+        self.btn_record.setText(name_state.get(self.is_recording))
 
     def add_row(self):
-        self.tab_action.insertRow(self.tab_action.rowCount())
+        selection = set([id.row() for id in self.tab_action.selectedIndexes()])
+        row_id = self.tab_action.rowCount()
+        if selection:
+            row_id = max(selection)+1
+
+        self.tab_action.insertRow(row_id)
         self.is_saved = False
 
     def remove_row(self):
@@ -135,16 +167,18 @@ class ActionWindow(QWidget):
         model = self.tab_action.model()
         selected_rows = list(set([id.row() for id in self.tab_action.selectedIndexes()]))
 
-        data = ''
-        for row in selected_rows:
-            id = model.index(row, 0)
-            data += (str(model.data(id)))
+        if selected_rows:
+            data = ''
+            for row in selected_rows:
+                id = model.index(row, 0)
+                data += (str(model.data(id)))
 
-        first_cell_row = selected_rows[0]
-        self.tab_action.setItem(first_cell_row, 0, QTableWidgetItem(data))
+            first_cell_row = selected_rows[0]
+            self.tab_action.setItem(first_cell_row, 0, QTableWidgetItem(data))
+            print(invert_table_key(data))
 
-        for row in range(1, len(selected_rows)):
-            self.tab_action.removeRow(first_cell_row+1)
+            for row in range(1, len(selected_rows)):
+                self.tab_action.removeRow(first_cell_row+1)
 
     def split_row(self):
         print (MainGame.hex_to_modifiers('09'))
@@ -180,14 +214,10 @@ class ActionWindow(QWidget):
         if button == 'add':
             self.is_rewriting_mode = False
         elif button == 'rewrite' and not self.is_rewriting_mode:
-            print('погнали')
+            self.tab_action.setRowCount(0)
             self.is_rewriting_mode = True
 
     def move_row(self, direction):
-        """model = self.tab_action.selectionModel()
-        selected = model.selectedRows()
-        if not selected:"""
-        # cell_pos = (self.tab_action.currentRow(), self.tab_action.currentColumn())
         row_id = self.tab_action.currentRow()
         col_id = self.tab_action.currentColumn()
         if direction not in (self.UP, self.DOWN) or row_id == -1:
@@ -213,9 +243,6 @@ class ActionWindow(QWidget):
             return
 
     def show_loading_act_dialog(self):
-        """csv_path = self.show_loading_act_dialog()
-        if csv_path:
-            self.load_pic_action(csv_path)"""
         csv_path = QFileDialog.getOpenFileName(None, "Load Picture Action", os.getcwd() + '\\actions',
                                                     "CSV file (*.csv)")[0]
         if csv_path:
@@ -334,16 +361,6 @@ class ActionWindow(QWidget):
             self.act_picture.setPixmap(QtGui.QPixmap(file_name[0]))
             #self.picture_action_global.picture_url = file_name[0]
             self.is_saved = False
-
-
-class ActionPicture:
-    def __init__(self, name="default action", picture_url="actions/pictures/default.png", csv_path=None,
-                 combination=[]):
-        self.name = name
-        self.picture_url = picture_url
-        self.combination = combination
-        self.csv_url = csv_path
-
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
