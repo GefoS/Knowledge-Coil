@@ -6,6 +6,7 @@ class CsvParams:
     SHIFT_TO_CONTENT = 3
     PICTURE_ROW = 1
     NAME_ROW = 0
+    COMPLEX_KEY_DELIMITER = ':'
 
 
 class KeyShortcuts:

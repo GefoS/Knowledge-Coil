@@ -579,8 +579,14 @@
     </property>
     <addaction name="actionLoad_Key_Settings"/>
    </widget>
+   <widget class="QMenu" name="menuRec">
+    <property name="title">
+     <string>Rec</string>
+    </property>
+   </widget>
    <addaction name="menuFile"/>
    <addaction name="menuSettings"/>
+   <addaction name="menuRec"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <action name="actionNew_Action">
