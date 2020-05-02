@@ -8,9 +8,11 @@ from PySide2 import QtXml
 from PySide2.QtGui import QKeySequence
 from PySide2.QtUiTools import QUiLoader
 from PySide2.QtWidgets import QApplication, QPushButton, QLineEdit, QTableWidget, QLabel, QTableWidgetItem, \
-    QMenu, QMessageBox, QFileDialog, QWidget, QRadioButton, QAction
+    QMenu, QMessageBox, QFileDialog, QWidget, QRadioButton, QAction, QComboBox
 from PySide2.QtCore import QFile, QEvent, Qt
 
+import EventHandler
+import SettingsParser
 from global_params import CsvParams, KeyShortcuts
 import MainGame
 
@@ -34,11 +36,14 @@ class ActionWindow(QWidget):
         self.UP = 1
         self.DOWN = -1
 
-        self.csv_linked_path = ''
         self.is_saved = True
         self.is_recording = False
-        # add -> false, rewrite -> true
-        self.is_rewriting_mode = False
+        self.is_rewriting_mode = False # add -> false, rewrite -> true
+
+        self.csv_linked_path = ''
+        self.opened_box_id = -1
+        self.keys_map = dict()
+        self.command_box = QComboBox()
         self.complex_keys = list()
 
         super(ActionWindow, self).__init__(parent)
@@ -51,6 +56,7 @@ class ActionWindow(QWidget):
 
         # tab
         self.tab_action:QTableWidget = self.window.findChild(QTableWidget, "tab_action")
+        self.tab_action.horizontalHeader().setStretchLastSection(True)
 
         self.btn_add = self.window.findChild(QPushButton, "btn_add")
         self.btn_down = self.window.findChild(QPushButton, "btn_down")
@@ -76,7 +82,7 @@ class ActionWindow(QWidget):
         self.menu_save = self.menu_file[2]
         self.menu_save_as = self.menu_file[3]
         self.menu_import_pic = self.menu_file[5]
-        self.menu_settings = self.window.findChild(QMenu, 'menuSettings').actions()[0]
+        self.menu_settings:QAction = self.window.findChild(QMenu, 'menuSettings').actions()[0]
         self.sc_record: QtWidgets.QShortcut = QtWidgets.QShortcut(QKeySequence('Ctrl+R'), self.btn_record)
 
         self.btn_add.clicked.connect(self.add_row)
@@ -90,30 +96,28 @@ class ActionWindow(QWidget):
         self.rbtn_add.clicked.connect(self.check_add_mode)
         self.rbtn_rewrite.clicked.connect(self.check_rewrite_mode)
 
+        #self.tab_action.itemChanged.connect(self.unsaved)
         self.tab_action.itemChanged.connect(self.unsaved)
+        self.tab_action.cellClicked.connect(self.init_box_signal)
 
         self.menu_new.triggered.connect(self.new_pic_action)
-        self.menu_load.triggered.connect(self.load)
         self.menu_import_pic.triggered.connect(self.import_picture)
         self.menu_save.triggered.connect(self.save_short)
         self.menu_save_as.triggered.connect(self.save_full)
-        #self.act_record.triggered.connect(lambda: print('11'))
-        #print (self.act_record)
-        # self.menu_settings.triggered.connect(self.test)
+        self.menu_settings.triggered.connect(self.show_loading_settings_dialog)
 
         self.rbtn_add.setChecked(True)
         self.window.installEventFilter(self)
-        self.window.show()
-
-        self.tab_action.setRowCount(0)
         self.act_picture.setPixmap(QtGui.QPixmap(self.DEFAULT_PICTURE))
+
+        self.window.show()
 
     def eventFilter(self, obj, event: QEvent):
         if obj == self.window and self.is_recording:
             if event.type() == QEvent.MouseButtonPress:
-                self.write_to_table(MainGame.invert_mouse_event(event))
+                self.write_to_table(EventHandler.invert_mouse_event(event))
             elif event.type() == QEvent.KeyPress and not event.isAutoRepeat():
-                key_seq = MainGame.hook_key_event(event)
+                key_seq = EventHandler.hook_key_event(event)
                 if key_seq == True:
                     return True
                 self.write_to_table(key_seq.toString())
@@ -134,7 +138,6 @@ class ActionWindow(QWidget):
 
         row_id = self.add_row()
         self.tab_action.rowCount()
-        print (self.tab_action.rowCount()-1, data)
         self.tab_action.setItem(row_id, 0, QTableWidgetItem(data))
 
     def toggle_recording(self):
@@ -145,6 +148,30 @@ class ActionWindow(QWidget):
         self.is_recording = not self.is_recording
         self.btn_record.setText(name_state.get(self.is_recording))
 
+    def init_box_signal(self):
+        col = self.tab_action.currentColumn()
+        if col == 0:
+            return
+        row = self.tab_action.currentRow()
+
+        self.init_box_in_cell(row)
+
+    def close_box_in_cell(self):
+        pass
+
+    def init_box_in_cell(self, row):
+        key = self.tab_action.item(row, 0).text()
+        commands = self.keys_map.get(key, False)
+        if not key or not commands:
+            return
+        print ('прошел')
+        self.command_box.clear()
+        if isinstance(commands, list):
+            self.command_box.insertItems(0, commands)
+            self.tab_action.setCellWidget(row, 1, self.command_box)
+        else:
+            self.setItem(row, 1, QTableWidgetItem(commands))
+
     def add_row(self):
         selection = set([id.row() for id in self.tab_action.selectedIndexes()])
         row_id = self.tab_action.rowCount()
@@ -154,6 +181,7 @@ class ActionWindow(QWidget):
         self.tab_action.insertRow(row_id)
         self.is_saved = False
         self.tab_action.setCurrentCell(row_id, 0)
+
         return row_id
 
     def remove_row(self):
@@ -190,21 +218,10 @@ class ActionWindow(QWidget):
                 self.tab_action.removeRow(first_cell_row+1)
 
     def split_row(self):
-        for i in self.complex_keys:
-            print (self.find_key_index(i).row())
+        for k, v in self.keys_map.items():
+            print (k, v)
 
-    def find_key_index(self, key):
-        key = ''.join(key)
-        model = self.tab_action.model()
-
-        for row in range(model.rowCount()):
-            index = model.index(row, 0)
-            if key == str(model.data(index)):
-                return index
-        return False
-
-
-    def load(self):
+    def load_action(self):
         if not self.is_saved:
             ret_val = self.show_exit_save_dialog()
             if ret_val == QMessageBox.Save:
@@ -267,6 +284,12 @@ class ActionWindow(QWidget):
         else:
             return
 
+    def show_loading_settings_dialog(self):
+        xml_path = QFileDialog.getOpenFileName(None, "Load Picture Action", os.getcwd() + '\\actions',
+                                                    "XML file (*.xml)")[0]
+        if xml_path:
+            self.keys_map = SettingsParser.parse_settings_xml(xml_path)
+
     def show_loading_act_dialog(self):
         csv_path = QFileDialog.getOpenFileName(None, "Load Picture Action", os.getcwd() + '\\actions',
                                                     "CSV file (*.csv)")[0]
@@ -287,16 +310,19 @@ class ActionWindow(QWidget):
     def get_table_data(self):
         model = self.tab_action.model()
         data = []
+        complex_keys_map = self.complex_keys_map()
 
         for row in range(model.rowCount()):
             data.append([])
             for col in range(model.columnCount()):
                 index = model.index(row, col)
-                cell = str(model.data(index))
-                if cell == 'None':
-                    cell = ''
-                data[row].append(cell)
-
+                cell_data = str(model.data(index))
+                complex_key = complex_keys_map.get(index, False)
+                if complex_key:
+                    cell_data = complex_key
+                if cell_data == 'None':
+                    cell_data = ''
+                data[row].append(cell_data)
         return data
 
     def assign_complex_keys(self, data):
@@ -305,23 +331,37 @@ class ActionWindow(QWidget):
             if CsvParams.COMPLEX_KEY_DELIMITER in key:
                 self.complex_keys.append(key.split(':'))
 
+    def complex_keys_map(self):
+        key_map = dict()
+        model = self.tab_action.model()
+
+        for complex_key in self.complex_keys:
+            full_key = ''.join(complex_key)
+            for row in range(model.rowCount()):
+                index = model.index(row, 0)
+                if full_key == str(model.data(index)):
+                    key_map[index] = ':'.join(complex_key)
+        return key_map
+
     def load_pic_action(self, csv_path):
         data = []
         with open(csv_path, newline='') as pic_file:
             reader = csv.reader(pic_file, delimiter=',', quotechar='|')
             data = list(reader)
         self.tab_action.setRowCount(len(data) - CsvParams.SHIFT_TO_CONTENT)
+        self.assign_complex_keys(data[CsvParams.SHIFT_TO_CONTENT:])
 
         for row in range(self.tab_action.rowCount()):
-            self.tab_action.setItem(row, 0, QTableWidgetItem(data[row + CsvParams.SHIFT_TO_CONTENT][0]))
+            key_cell = data[row + CsvParams.SHIFT_TO_CONTENT][0]
+            if ':' in key_cell:
+                key_cell = key_cell.replace(':', '')
+            self.tab_action.setItem(row, 0, QTableWidgetItem(key_cell))
             self.tab_action.setItem(row, 1, QTableWidgetItem(data[row + CsvParams.SHIFT_TO_CONTENT][1]))
 
-        name = data[0][1]
+        name = data[CsvParams.NAME_ROW][1]
         pic_url = str(data[CsvParams.PICTURE_ROW][1])
         self.act_picture.setPixmap(QtGui.QPixmap(pic_url))
         self.le_name.setText(name)
-        self.assign_complex_keys(data[CsvParams.SHIFT_TO_CONTENT:])
-
         self.is_saved = True
         self.csv_linked_path = csv_path
 
@@ -356,7 +396,6 @@ class ActionWindow(QWidget):
             csv_writer.writerow(['pic_path', pic_path])
             csv_writer.writerow(['Key', 'Command'])
             for row in self.get_table_data():
-                print(row)
                 csv_writer.writerow(row)
 
         self.act_picture.pixmap().save(pic_path, format='PNG')

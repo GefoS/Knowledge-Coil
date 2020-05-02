@@ -21,6 +21,7 @@ from PySide2.QtGui import QKeySequence
 #             result[key] = tuple(QKeySequence(ord(key)) for key in value)
 #     return result
 
+
 def hex_to_modifiers(hex_key):
     tab = {
         '09' : Qt.CTRL,
@@ -69,8 +70,3 @@ def parse_settings_xml(xml_path):
     key_map.pop('', False)
     filtered_key_map = {hex_to_key(key):command for key, command in key_map.items()}
     return filtered_key_map
-
-pr = parse_settings_xml('key_settings.xml')
-
-for k, v in pr.items():
-    print (k, v)

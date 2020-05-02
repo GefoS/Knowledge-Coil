@@ -1,53 +1,13 @@
-import sys, csv, datetime, warnings
-import xml.etree.ElementTree as et
+import sys, csv, datetime
 
-from PySide2 import QtXml, QtGui, QtCore
+from PySide2 import QtGui
 from PySide2.QtGui import QKeySequence
 from PySide2.QtUiTools import QUiLoader
 from PySide2.QtWidgets import QApplication, QPushButton, QLabel, QPlainTextEdit, QMainWindow
 from PySide2.QtCore import QFile, QObject, QTimer, SIGNAL, QLine, QEvent, Qt
 
-from global_params import CsvParams, KeyShortcuts
-
-
-def hook_mouse_event(event):
-    if event.button() == Qt.MouseButton.LeftButton:
-        return (KeyShortcuts.MOUSE_LEFT[1] + '\n')
-    elif event.button() == Qt.MouseButton.RightButton:
-        return (KeyShortcuts.MOUSE_RIGHT[1] + '\n')
-
-def invert_mouse_event(event):
-    if event.button() == Qt.MouseButton.LeftButton:
-        return KeyShortcuts.MOUSE_LEFT[2]
-    elif event.button() == Qt.MouseButton.RightButton:
-        return KeyShortcuts.MOUSE_RIGHT[2]
-
-def hook_key_event(event):
-    key = event.key()
-
-    if key == Qt.Key_unknown:
-        warnings.warn("Unknown key from a macro probably")
-        return True
-
-    if key in (Qt.Key_Shift, Qt.Key_Control, Qt.Key_Alt, Qt.Key_Meta):
-        return True
-
-    modifiers = event.modifiers()
-    if modifiers & QtCore.Qt.ShiftModifier:
-        key += QtCore.Qt.SHIFT
-    if modifiers & QtCore.Qt.ControlModifier:
-        key += QtCore.Qt.CTRL
-    if modifiers & QtCore.Qt.AltModifier:
-        key += QtCore.Qt.ALT
-    if modifiers & QtCore.Qt.MetaModifier:
-        key += QtCore.Qt.META
-
-    k_seq = QKeySequence(key)
-
-    if k_seq in KeyShortcuts.reserved_shortcuts:
-        return True
-
-    return k_seq
+from EventHandler import hook_mouse_event, hook_key_event
+from global_params import CsvParams
 
 
 def form_timer_label(minute, second):
@@ -63,51 +23,6 @@ def form_timer_label(minute, second):
         label += str(second)
     return label
 
-def hex_to_modifiers(hex_key):
-    tab = {
-        '09' : Qt.CTRL,
-        '11' : Qt.ALT,
-        '05' : Qt.SHIFT,
-        '0d' : Qt.CTRL + Qt.SHIFT,
-        '19' : Qt.CTRL + Qt.ALT,
-        '15' : Qt.ALT + Qt.SHIFT,
-        '01' : 0
-    }
-    return tab.get(hex_key, -1)
-
-def hex_to_sequence(keys):
-    result = dict()
-    for key, value in keys.items():
-        if len(value) == 1:
-            result[key] = QKeySequence(value)
-        elif value.startswith('hex'):
-            hex_keys = value[value.index(':')+1:]
-            hex_split = hex_keys.split(',')
-            full_key = hex_to_modifiers(hex_split[4])
-            if full_key != -1:
-                full_key += int(hex_split[6], 16)
-                hex_split = QKeySequence(full_key)
-            result[key] = hex_split
-        else:
-            result[key] = tuple(QKeySequence(ord(key)) for key in value)
-    return result
-
-
-def parse_settings_xml(xml_path):
-    tree = et.parse(xml_path)
-    root = tree.getroot()
-    key_leaf = [elem for elem in root[1].iter('Value')]
-    key_values = [key_value.text for key_value in key_leaf][1:]
-    key_values = list(map(lambda kv: kv.replace('"', ''), key_values))
-
-    key_map = dict()
-    for key_value in key_values:
-        key_value = key_value.split('=')
-        if len(key_value) == 2:
-            key_map[key_value[0]] = key_value[1]
-
-    filtered_map = {k : v for k, v in hex_to_sequence(key_map).items() if v}
-    return filtered_map
 
 class Combination:
 
