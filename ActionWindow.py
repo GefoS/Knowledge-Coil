@@ -1,8 +1,6 @@
-import sys
-import os
-import csv
+import sys, os, csv
+from shutil import copyfile
 
-import PySide2
 from PySide2 import QtGui, QtWidgets
 from PySide2 import QtXml
 from PySide2.QtGui import QKeySequence
@@ -14,8 +12,6 @@ from PySide2.QtCore import QFile, QEvent, Qt
 import EventHandler
 import SettingsParser
 from global_params import CsvParams, KeyShortcuts
-import MainGame
-
 
 def invert_table_key(tab_key):
     if len(tab_key) == 1:
@@ -33,6 +29,7 @@ class ActionWindow(QWidget):
     def __init__(self, ui_file, parent=None):
 
         self.DEFAULT_PICTURE = "actions/pictures/default.png"
+        self.CUSTOM_COMMAND_ROW = 'Custom command...'
         self.UP = 1
         self.DOWN = -1
 
@@ -43,6 +40,9 @@ class ActionWindow(QWidget):
         self.csv_linked_path = ''
         self.opened_box_id = -1
         self.keys_map = dict()
+        if 'key_settings.xml' in (os.listdir(os.getcwd()+'\\settings')):
+            self.keys_map = SettingsParser.parse_settings_xml(os.getcwd()+'\\settings\\key_settings.xml')
+        self.custom_commands = dict()
         self.command_box = QComboBox()
         self.complex_keys = list()
 
@@ -93,18 +93,21 @@ class ActionWindow(QWidget):
         self.btn_split.clicked.connect(self.split_row)
         self.btn_record.clicked.connect(self.toggle_recording)
 
+        self.command_box.textActivated.connect(lambda command: self.close_box_in_cell(command))
+
         self.rbtn_add.clicked.connect(self.check_add_mode)
         self.rbtn_rewrite.clicked.connect(self.check_rewrite_mode)
 
         #self.tab_action.itemChanged.connect(self.unsaved)
         self.tab_action.itemChanged.connect(self.unsaved)
-        self.tab_action.cellClicked.connect(self.init_box_signal)
+        self.tab_action.cellClicked.connect(lambda row, column: self.init_box_signal(row, column))
 
         self.menu_new.triggered.connect(self.new_pic_action)
         self.menu_import_pic.triggered.connect(self.import_picture)
         self.menu_save.triggered.connect(self.save_short)
         self.menu_save_as.triggered.connect(self.save_full)
         self.menu_settings.triggered.connect(self.show_loading_settings_dialog)
+        self.menu_load.triggered.connect(self.load_action)
 
         self.rbtn_add.setChecked(True)
         self.window.installEventFilter(self)
@@ -148,29 +151,48 @@ class ActionWindow(QWidget):
         self.is_recording = not self.is_recording
         self.btn_record.setText(name_state.get(self.is_recording))
 
-    def init_box_signal(self):
-        col = self.tab_action.currentColumn()
-        if col == 0:
+    def init_box_signal(self, row, column):
+        if column == 0:
             return
-        row = self.tab_action.currentRow()
-
         self.init_box_in_cell(row)
 
-    def close_box_in_cell(self):
-        pass
+    def close_box_in_cell(self, row, selected_command):
+        self.tab_action.removeCellWidget(row, 1)
+        if selected_command == self.CUSTOM_COMMAND_ROW:
+            self.tab_action.setItem(row, 1, QTableWidgetItem(''))
+            self.tab_action.edit(self.tab_action.model().index(row, 1))
+        else:
+            item = QTableWidgetItem(selected_command)
+            self.tab_action.setItem(row, 1, item)
 
     def init_box_in_cell(self, row):
-        key = self.tab_action.item(row, 0).text()
+        try:
+            key = self.tab_action.item(row, 0).text()
+        except AttributeError:
+            return
         commands = self.keys_map.get(key, False)
         if not key or not commands:
             return
-        print ('прошел')
+
         self.command_box.clear()
         if isinstance(commands, list):
-            self.command_box.insertItems(0, commands)
-            self.tab_action.setCellWidget(row, 1, self.command_box)
+            if self.CUSTOM_COMMAND_ROW not in commands:
+                commands.insert(0, self.CUSTOM_COMMAND_ROW)
+            try:
+                custom_command = self.tab_action.item(row, 1).text()
+                if custom_command not in commands:
+                    commands.insert(1, custom_command)
+            except AttributeError:
+                pass
+            finally:
+                box = QComboBox()
+                box.insertItems(0, commands)
+                box.setCurrentIndex(1)
+                self.tab_action.setCellWidget(row, 1, box)
+
+                box.textActivated.connect(lambda command:self.close_box_in_cell(row, command))
         else:
-            self.setItem(row, 1, QTableWidgetItem(commands))
+            self.tab_action.setItem(row, 1, QTableWidgetItem(commands))
 
     def add_row(self):
         selection = set([id.row() for id in self.tab_action.selectedIndexes()])
@@ -289,6 +311,8 @@ class ActionWindow(QWidget):
                                                     "XML file (*.xml)")[0]
         if xml_path:
             self.keys_map = SettingsParser.parse_settings_xml(xml_path)
+            cwd = os.getcwd().__str__()
+            copyfile(xml_path, cwd+'\\settings\\key_settings.xml')
 
     def show_loading_act_dialog(self):
         csv_path = QFileDialog.getOpenFileName(None, "Load Picture Action", os.getcwd() + '\\actions',
