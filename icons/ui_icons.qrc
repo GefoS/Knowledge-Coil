@@ -1,5 +1,11 @@
 <RCC>
   <qresource prefix="ui_icons">
+    <file>login_cancel.png</file>
+    <file>login_okay.png</file>
+    <file>down.png</file>
+    <file>up.png</file>
+    <file>merge.png</file>
+    <file>remove.png</file>
     <file>plus.png</file>
     <file>test.png</file>
   </qresource>

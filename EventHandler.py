@@ -9,9 +9,9 @@ from global_params import KeyShortcuts
 
 def hook_mouse_event(event):
     if event.button() == Qt.MouseButton.LeftButton:
-        return (KeyShortcuts.MOUSE_LEFT[1] + '\n')
+        return (KeyShortcuts.MOUSE_LEFT[2])
     elif event.button() == Qt.MouseButton.RightButton:
-        return (KeyShortcuts.MOUSE_RIGHT[1] + '\n')
+        return (KeyShortcuts.MOUSE_RIGHT[2])
 
 
 def invert_mouse_event(event):
@@ -41,9 +41,9 @@ def hook_key_event(event):
     if modifiers & QtCore.Qt.MetaModifier:
         key += QtCore.Qt.META
 
-    k_seq = QKeySequence(key)
+    #k_seq = QKeySequence(key)
 
-    if k_seq in KeyShortcuts.reserved_shortcuts:
+    if QKeySequence(key) in KeyShortcuts.reserved_shortcuts:
         return True
 
-    return k_seq
+    return key

@@ -10,6 +10,11 @@ class CsvParams:
 
 
 class KeyShortcuts:
+    mouse_shorts = ('ML', 'MR')
+    mouse_shorts_map = {
+        'ML': 'MouseLeft',
+        'MR': 'MouseRight'
+    }
     MOUSE_LEFT = (Qt.MouseButton.LeftButton, 'MouseLeft', 'ML')
     MOUSE_RIGHT = (Qt.MouseButton.RightButton, 'MouseRight', 'MR')
 

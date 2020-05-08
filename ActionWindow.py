@@ -11,6 +11,7 @@ from PySide2.QtCore import QFile, QEvent, Qt
 
 import EventHandler
 import SettingsParser
+import icons.ui_icons
 from global_params import CsvParams, KeyShortcuts
 
 def invert_table_key(tab_key):
@@ -25,7 +26,6 @@ def invert_table_key(tab_key):
 
 
 class ActionWindow(QWidget):
-
     def __init__(self, ui_file, parent=None):
 
         self.DEFAULT_PICTURE = "actions/pictures/default.png"
@@ -41,7 +41,7 @@ class ActionWindow(QWidget):
         self.opened_box_id = -1
         self.keys_map = dict()
         if 'key_settings.xml' in (os.listdir(os.getcwd()+'\\settings')):
-            self.keys_map = SettingsParser.parse_settings_xml(os.getcwd()+'\\settings\\key_settings.xml')
+            self.keys_map = SettingsParser.parse_to_sequence(os.getcwd() + '\\settings\\key_settings.xml')
         self.custom_commands = dict()
         self.command_box = QComboBox()
         self.complex_keys = list()
@@ -54,6 +54,8 @@ class ActionWindow(QWidget):
         self.window = loader.load(ui_file)
         ui_file.close()
 
+        #icons = QResource.registerResource()
+
         # tab
         self.tab_action:QTableWidget = self.window.findChild(QTableWidget, "tab_action")
         self.tab_action.horizontalHeader().setStretchLastSection(True)
@@ -63,10 +65,7 @@ class ActionWindow(QWidget):
         self.btn_up = self.window.findChild(QPushButton, "btn_up")
         self.btn_remove = self.window.findChild(QPushButton, "btn_remove")
         self.btn_merge:QPushButton = self.window.findChild(QPushButton, "btn_merge")
-        self.btn_split:QPushButton = self.window.findChild(QPushButton, "btn_split")
 
-        self.btn_edit = self.window.findChild(QPushButton, "btn_edit")
-        self.btn_apply = self.window.findChild(QPushButton, "btn_apply")
         self.btn_record:QPushButton = self.window.findChild(QPushButton, "btn_record")
 
         # img
@@ -90,7 +89,6 @@ class ActionWindow(QWidget):
         self.btn_up.clicked.connect(self.up_row)
         self.btn_down.clicked.connect(self.down_row)
         self.btn_merge.clicked.connect(self.merge_row)
-        self.btn_split.clicked.connect(self.split_row)
         self.btn_record.clicked.connect(self.toggle_recording)
 
         self.command_box.textActivated.connect(lambda command: self.close_box_in_cell(command))
@@ -112,6 +110,7 @@ class ActionWindow(QWidget):
         self.rbtn_add.setChecked(True)
         self.window.installEventFilter(self)
         self.act_picture.setPixmap(QtGui.QPixmap(self.DEFAULT_PICTURE))
+        self.tab_action.setRowCount(0)
 
         self.window.show()
 
@@ -120,10 +119,10 @@ class ActionWindow(QWidget):
             if event.type() == QEvent.MouseButtonPress:
                 self.write_to_table(EventHandler.invert_mouse_event(event))
             elif event.type() == QEvent.KeyPress and not event.isAutoRepeat():
-                key_seq = EventHandler.hook_key_event(event)
-                if key_seq == True:
+                key = EventHandler.hook_key_event(event)
+                if key == True:
                     return True
-                self.write_to_table(key_seq.toString())
+                self.write_to_table(QKeySequence(key).toString())
             elif event.type() == QEvent.KeyRelease and event.key() == Qt.Key_Tab:
                 self.write_to_table(QKeySequence(Qt.Key_Tab))
             else:
@@ -310,7 +309,7 @@ class ActionWindow(QWidget):
         xml_path = QFileDialog.getOpenFileName(None, "Load Picture Action", os.getcwd() + '\\actions',
                                                     "XML file (*.xml)")[0]
         if xml_path:
-            self.keys_map = SettingsParser.parse_settings_xml(xml_path)
+            self.keys_map = SettingsParser.parse_to_sequence(xml_path)
             cwd = os.getcwd().__str__()
             copyfile(xml_path, cwd+'\\settings\\key_settings.xml')
 

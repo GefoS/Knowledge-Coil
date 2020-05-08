@@ -3,5 +3,7 @@
 /Main.exe
 /Main.spec
 /Test.py
-/icons/*.png
 /actions/
+/key_settings.xml
+/levin.xml
+/users/
