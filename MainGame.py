@@ -137,9 +137,6 @@ class LoggingWindow(QWidget):
             self.set_settings_label(file_name)
             self.btn_settings_name_edit.setDisabled(False)
             self.lb_login_status.setPixmap(QPixmap.fromImage('icons/login_okay.png'))
-            # self.lb_login_status.setScaledContents(False)
-            # self.lb_login_status.update(self.lb_login_status.rect())
-            # self.lb_login_status.setScaledContents(True)
         else:
             self.lb_login_status.setPixmap(QPixmap('icons/login_cancel.png'))
             self.le_username.blockSignals(True)
@@ -295,6 +292,7 @@ class MainGame(QMainWindow):
         self.btn_skip.clicked.connect(self.next_combination)
 
         self.window.installEventFilter(self)
+        self.window.adjustSize()
 
         self.logging_window = LoggingWindow('ui\LoggingDialog.ui')
         self.logging_window.btn_login.clicked.connect(self.login_in_game)
@@ -332,7 +330,8 @@ class MainGame(QMainWindow):
         self.global_timer.start(self.game_time)
         self.second_timer.start(1000)
 
-        self.build_action_queue(4)
+        queue_size = math.trunc((self.game_time/60000)*2)
+        self.build_action_queue(queue_size)
         self.next_combination()
 
     def next_combination(self):
@@ -340,8 +339,11 @@ class MainGame(QMainWindow):
             self.stop_game()
         else:
             current_action = self.action_by_name(self.actions_queue.get())
-            self.picture_holder.setPixmap(QtGui.QPixmap(current_action.picture_path))
+            new_picture = QtGui.QPixmap(current_action.picture_path)
+            self.picture_holder.setPixmap(self.scale_picture(new_picture))
             self.current_combination = current_action.combination
+            self.log.clear()
+            self.game_step = 0
             print(self.current_combination)
 
     def draw_key(self, key):
@@ -350,13 +352,16 @@ class MainGame(QMainWindow):
                 return KeyShortcuts.mouse_shorts_map.get(coded_key)
             else:
                 return QKeySequence(coded_key).toString()
-        if self.game_step < len(self.current_combination):
+        last_key_pos = len(self.current_combination)
+        if self.game_step < last_key_pos:
             role = self.current_combination[self.game_step] == key
             self.insert_key_to_log(key_to_text(key), role)
+            if self.game_step+1 == last_key_pos :
+                self.insert_key_to_log('Решено! Нажмите любую клавишу, чтобы продолжить.', True)
         else:
-            self.insert_key_to_log(key_to_text(key), False)
+            self.next_combination()
+            return
         self.game_step += 1
-
 
     def show_start_countdown_dialog(self):
         def get_cur_time():
@@ -371,7 +376,6 @@ class MainGame(QMainWindow):
         msg_box.setIcon(QMessageBox.Information)
         msg_box.setText('Игра начнется через 5 секунд')
         msg_box.addButton('Начать сейчас', QMessageBox.YesRole)
-        #start_button = QPushButton('Начать сейчас')
         countdown_timer = QTimer(msg_box)
         over_timer =  QTimer(msg_box)
         countdown_timer.timeout.connect(lambda:
@@ -381,7 +385,6 @@ class MainGame(QMainWindow):
         over_timer.start(5000)
         countdown_timer.start(1000)
         msg_box.exec_()
-
 
     def get_last_key(self):
         full_log = self.log.toPlainText().split('\n')
@@ -446,6 +449,14 @@ class MainGame(QMainWindow):
 
     def action_by_name(self, name):
         return KeyAction('actions/{}'.format(name), self.user_settings)
+
+    def scale_picture(self, picture:QPixmap):
+        max_W = self.picture_holder.maximumWidth()
+        max_H = self.picture_holder.maximumHeight()
+        if picture.height() > max_H or picture.width() > max_W:
+            return picture.scaled(max_W, max_H, Qt.KeepAspectRatio)
+        else:
+            return picture
 
 def main():
     app = QApplication(sys.argv)

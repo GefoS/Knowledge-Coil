@@ -54,8 +54,6 @@ class ActionWindow(QWidget):
         self.window = loader.load(ui_file)
         ui_file.close()
 
-        #icons = QResource.registerResource()
-
         # tab
         self.tab_action:QTableWidget = self.window.findChild(QTableWidget, "tab_action")
         self.tab_action.horizontalHeader().setStretchLastSection(True)

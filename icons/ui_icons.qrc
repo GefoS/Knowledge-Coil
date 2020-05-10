@@ -1,5 +1,8 @@
 <RCC>
   <qresource prefix="ui_icons">
+    <file>reset.png</file>
+    <file>skip.png</file>
+    <file>undo.png</file>
     <file>login_cancel.png</file>
     <file>login_okay.png</file>
     <file>down.png</file>
