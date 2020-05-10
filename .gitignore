@@ -3,7 +3,5 @@
 /Main.exe
 /Main.spec
 /Test.py
-/actions/
-/key_settings.xml
-/levin.xml
 /users/
+!/users/users_settings.csv

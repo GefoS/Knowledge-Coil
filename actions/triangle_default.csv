@@ -1,0 +1,7 @@
+name,triangle_default
+pic_path,actions/pictures/triangle_default.png
+Key,Command
+R:E:C:3,SketchThreePointRectangleCmd
+ML,
+ML,
+ML,

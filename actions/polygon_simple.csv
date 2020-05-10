@@ -1,0 +1,7 @@
+name,polygon_simple
+pic_path,actions/pictures/polygon_simple.png
+Key,Command
+R:E:C:3,SketchThreePointRectangleCmd
+ML,
+ML,
+ML,
