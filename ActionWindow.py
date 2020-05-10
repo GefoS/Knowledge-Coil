@@ -12,7 +12,8 @@ from PySide2.QtCore import QFile, QEvent, Qt
 import EventHandler
 import SettingsParser
 import icons.ui_icons
-from global_params import CsvParams, KeyShortcuts
+from global_params import CsvParams, KeyShortcuts, GlobalParams
+
 
 def invert_table_key(tab_key):
     if len(tab_key) == 1:
@@ -109,6 +110,8 @@ class ActionWindow(QWidget):
         self.window.installEventFilter(self)
         self.act_picture.setPixmap(QtGui.QPixmap(self.DEFAULT_PICTURE))
         self.tab_action.setRowCount(0)
+
+        self.window.setWindowTitle('{} Admin'.format(GlobalParams.application_name))
 
         self.window.show()
 

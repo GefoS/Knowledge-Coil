@@ -34,6 +34,10 @@
   <property name="windowTitle">
    <string>Form</string>
   </property>
+  <property name="windowIcon">
+   <iconset resource="../icons/ui_icons.qrc">
+    <normaloff>:/ui_icons/coil.png</normaloff>:/ui_icons/coil.png</iconset>
+  </property>
   <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>

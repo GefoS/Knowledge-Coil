@@ -1,6 +1,10 @@
 from PySide2.QtCore import Qt
-from PySide2.QtGui import QKeySequence
+from PySide2.QtGui import QKeySequence, QIcon
+import os
 
+class GlobalParams:
+    application_name = 'Knowledge Coil'
+    #application_icon = QIcon('\\icons\\coil.png')
 
 class CsvParams:
     SHIFT_TO_CONTENT = 3

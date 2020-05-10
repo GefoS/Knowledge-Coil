@@ -3,19 +3,19 @@ import random
 import sys, csv, datetime, math, os, html
 from shutil import copy2
 
-from PySide2 import QtGui
+from PySide2 import QtGui, QtXml
 from PySide2.QtGui import QKeySequence, QCloseEvent, QPalette, Qt, QPixmap
 from PySide2.QtUiTools import QUiLoader
 from PySide2.QtWidgets import QApplication, QPushButton, QLabel, QPlainTextEdit, QMainWindow, QWidget, QSlider, \
     QLineEdit, QMessageBox, QFileDialog
 from PySide2.QtCore import QFile, QObject, QTimer, SIGNAL, QLine, QEvent
 
-import SettingsParser
 import icons.ui_icons
 #pyside2-rcc -o D:\PycharmProjects\KnowledgeCoil\icons\ui_icons.py D:\PycharmProjects\KnowledgeCoil\icons\ui_icons.qrc
 from Action import KeyAction
+import SettingsParser
 from EventHandler import hook_mouse_event, hook_key_event
-from global_params import CsvParams, KeyShortcuts
+from global_params import KeyShortcuts, GlobalParams
 
 
 def form_timer_label(minute, second):
@@ -30,67 +30,6 @@ def form_timer_label(minute, second):
     else:
         label += str(second)
     return label
-
-class KeyHistory:
-    def __init__(self):
-        self.is_present = True
-        self.present_history = []
-        self.past_history = []
-
-    def draw(self, key):
-        if self.is_present:
-            self.present_history.append(key)
-        else:
-            self.present_history = self.past_history.copy()
-            self.present_history.append(key)
-            self.past_history.clear()
-            self.is_present = True
-
-    def undo(self):
-        if self.is_present and self.present_history:
-            self.past_history = self.present_history[:-1].copy()
-            self.is_present = False
-        elif self.past_history:
-            self.past_history = self.past_history[:-1]
-
-    def redo(self):
-        if not self.is_present:
-            if len(self.past_history) + 1 == len(self.present_history):
-                self.is_present = True
-                self.past_history.clear()
-            else:
-                self.past_history = self.present_history[:len(self.past_history) + 1].copy()
-
-    def stop_flow(self):
-        if not self.is_present:
-            a = 3
-            self.present_history = self.past_history.copy()
-            self.past_history.clear()
-            self.is_present = True
-
-    def clear(self):
-        self.present_history.clear()
-        self.past_history.clear()
-        self.is_present = True
-
-    def take_current_obj(self):
-        if self.is_present:
-            return self.present_history[-1]
-        else:
-            return self.past_history[-1]
-
-    def deep(self):
-        if self.is_present:
-            return len(self.present_history)
-        else:
-            return len(self.past_history)
-
-    def printer(self):
-        if self.is_present:
-            print('we are in present: ', self.present_history)
-        else:
-            print('we are in past: ', self.past_history)
-            print('our future: ', self.present_history)
 
 class LoggingWindow(QWidget):
     def __init__(self, ui_file, parent=None):
@@ -120,6 +59,7 @@ class LoggingWindow(QWidget):
         self.btn_settings_name_edit.clicked.connect(self.reload_settings)
         self.btn_login.clicked.connect(lambda: self.close())
 
+        self.logging_window.setWindowTitle('{} Login'.format(GlobalParams.application_name))
         self.logging_window.show()
 
     def closeEvent(self, event:QCloseEvent):
@@ -258,9 +198,11 @@ class MainGame(QMainWindow):
         self.user_settings = dict()
         self.game_time = 0
         self.game_step = 0
+        self.solved = False
 
         self.actions_queue = queue.Queue()
         self.current_combination = list()
+        self.action_name = ''
 
         super(MainGame, self).__init__(parent)
         ui_file = QFile(ui_file)
@@ -285,14 +227,15 @@ class MainGame(QMainWindow):
         self.second_timer = QTimer(self)
         self.second_timer.timeout.connect(self.redraw_label_timer)
         self.global_timer.timeout.connect(self.stop_game)
-        self.log.textChanged.connect(lambda:
-             self.log.verticalScrollBar().setValue(
-                 self.log.verticalScrollBar().maximum()))
+        self.log.textChanged.connect(self.scroll_log_to_max)
         self.btn_undo.clicked.connect(self.undo_action)
-        self.btn_skip.clicked.connect(self.next_combination)
+        self.btn_skip.clicked.connect(self.skip)
+        self.btn_clear.clicked.connect(self.reset)
 
         self.window.installEventFilter(self)
         self.window.adjustSize()
+        self.window.setWindowTitle('{} Game'.format(GlobalParams.application_name))
+       # self.window.setWindowIcon(GlobalParams.application_icon)
 
         self.logging_window = LoggingWindow('ui\LoggingDialog.ui')
         self.logging_window.btn_login.clicked.connect(self.login_in_game)
@@ -309,8 +252,9 @@ class MainGame(QMainWindow):
                     return True
 
                 self.draw_key(key)
-                #log_row = k_seq.toString() + '\n'
-                #self.insert_key_to_log(log_row, True)
+
+            elif event.type() == QEvent.KeyRelease and event.key() == Qt.Key.Key_Tab:
+                self.draw_key(event.key())
             else:
                 return False
         return QMainWindow.eventFilter(self, obj, event)
@@ -338,7 +282,8 @@ class MainGame(QMainWindow):
         if self.actions_queue.empty():
             self.stop_game()
         else:
-            current_action = self.action_by_name(self.actions_queue.get())
+            self.action_name = self.actions_queue.get()
+            current_action = self.action_by_name(self.action_name)
             new_picture = QtGui.QPixmap(current_action.picture_path)
             self.picture_holder.setPixmap(self.scale_picture(new_picture))
             self.current_combination = current_action.combination
@@ -356,11 +301,15 @@ class MainGame(QMainWindow):
         if self.game_step < last_key_pos:
             role = self.current_combination[self.game_step] == key
             self.insert_key_to_log(key_to_text(key), role)
-            if self.game_step+1 == last_key_pos :
+            self.solved = False
+            if self.game_step+1 == last_key_pos and role:
+                self.solved = True
                 self.insert_key_to_log('Решено! Нажмите любую клавишу, чтобы продолжить.', True)
-        else:
+        elif self.solved:
             self.next_combination()
             return
+        else:
+            self.insert_key_to_log(key_to_text(key), False)
         self.game_step += 1
 
     def show_start_countdown_dialog(self):
@@ -393,10 +342,19 @@ class MainGame(QMainWindow):
         except IndexError:
             return ''
 
+    def skip(self):
+        self.actions_queue.put(self.action_name)
+        self.next_combination()
+
+    def reset(self):
+        self.game_step = 0
+        self.log.clear()
+
     def undo_action(self):
         if self.game_step > 0:
             self.game_step -= 1
             self.log.undo()
+            self.scroll_log_to_max()
 
     def redo_action(self):
         self.game_step += 1
@@ -457,6 +415,10 @@ class MainGame(QMainWindow):
             return picture.scaled(max_W, max_H, Qt.KeepAspectRatio)
         else:
             return picture
+
+    def scroll_log_to_max(self):
+        self.log.verticalScrollBar().setValue(
+        self.log.verticalScrollBar().maximum())
 
 def main():
     app = QApplication(sys.argv)

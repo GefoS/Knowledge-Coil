@@ -1,5 +1,6 @@
 <RCC>
   <qresource prefix="ui_icons">
+    <file>coil.png</file>
     <file>reset.png</file>
     <file>skip.png</file>
     <file>undo.png</file>
