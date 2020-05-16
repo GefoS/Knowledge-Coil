@@ -14,12 +14,16 @@ from global_params import form_timer_label
 
 
 class SessionStat:
-    def __init__(self, username, game_time):
+    def __init__(self, username, game_time, parent):
         self.username = username
         self.game_time = game_time
         self.pure, self.unclear, self.skips, self.resets = [0]*4
         self.is_pure = True
-        self.finish_dialog = GameFinishedDialog()
+        self.finish_dialog = GameFinishedDialog(parent)
+
+        print(self.finish_dialog.parent())
+        print([method_name for method_name in dir(self.finish_dialog.parent())
+                  if callable(getattr(self.finish_dialog.parent(), method_name))])
 
     def solve(self):
         if self.is_pure:
@@ -45,13 +49,15 @@ class SessionStat:
 
 
 class GameFinishedDialog(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent):
         super(GameFinishedDialog, self).__init__(parent=parent)
         ui_file = QFile('ui\SessionStat.ui')
         ui_file.open(QFile.ReadOnly)
         loader = QUiLoader()
         self.finish_dialog = loader.load(ui_file)
         ui_file.close()
+
+        self.result = None
 
         self.stat_holders = []
         lb_time:QLabel = self.finish_dialog.findChild(QLabel, 'lb_time')
@@ -82,16 +88,8 @@ class GameFinishedDialog(QWidget):
     def handle_button(self, button):
         role = self.button_box.buttonRole(button)
         if role == QDialogButtonBox.ButtonRole.AcceptRole:
-            print('в разработке')
+            self.parent().logging_window.logging_window.show()
+            self.parent().window.hide()
+        else:
+            self.parent().window.close()
         self.finish_dialog.close()
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    stat = SessionStat ('lebanon', 30*1000*60)
-    stat.make_mistake()
-    stat.solve()
-    stat.solve()
-    stat.make_mistake()
-    stat.solve()
-    stat.finish_game(25*1000*60)
-    sys.exit(app.exec_())

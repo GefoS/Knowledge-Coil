@@ -412,6 +412,25 @@
     </item>
    </layout>
   </widget>
+  <widget class="QPushButton" name="btn_statistics">
+   <property name="geometry">
+    <rect>
+     <x>20</x>
+     <y>410</y>
+     <width>111</width>
+     <height>30</height>
+    </rect>
+   </property>
+   <property name="font">
+    <font>
+     <family>Trebuchet MS</family>
+     <pointsize>12</pointsize>
+    </font>
+   </property>
+   <property name="text">
+    <string>Статистика</string>
+   </property>
+  </widget>
  </widget>
  <resources>
   <include location="../icons/ui_icons.qrc"/>

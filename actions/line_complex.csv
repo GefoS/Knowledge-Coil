@@ -1,7 +1,7 @@
 name,line_complex
 pic_path,actions/pictures/line_complex.png
 Key,Command
-L,
+L,SketchLineWrapperCmd
 ML,
 3,
 0,

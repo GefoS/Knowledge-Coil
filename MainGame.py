@@ -1,35 +1,22 @@
 import queue
 import random
-import sys, csv, datetime, math, os, html
+import sys, csv, datetime, math, os
 from shutil import copy2
 
-from PySide2 import QtGui, QtXml
-from PySide2.QtGui import QKeySequence, QCloseEvent, QPalette, Qt, QPixmap
+from PySide2 import QtGui
+from PySide2.QtGui import QKeySequence, QCloseEvent, Qt, QPixmap
 from PySide2.QtUiTools import QUiLoader
 from PySide2.QtWidgets import QApplication, QPushButton, QLabel, QPlainTextEdit, QMainWindow, QWidget, QSlider, \
-    QLineEdit, QMessageBox, QFileDialog
-from PySide2.QtCore import QFile, QObject, QTimer, SIGNAL, QLine, QEvent
+    QLineEdit, QMessageBox, QFileDialog, QShortcut
+from PySide2.QtCore import QFile, QTimer, QEvent
 
-import icons.ui_icons
 #pyside2-rcc -o D:\PycharmProjects\KnowledgeCoil\icons\ui_icons.py D:\PycharmProjects\KnowledgeCoil\icons\ui_icons.qrc
 from Action import KeyAction
 import SettingsParser
 from EventHandler import hook_mouse_event, hook_key_event
-from global_params import KeyShortcuts, GlobalParams
+from SessionStat import SessionStat
+from global_params import KeyShortcuts, GlobalParams, form_timer_label
 
-
-def form_timer_label(minute, second):
-    label = ''
-    if minute < 10:
-        label += '0' + str(minute)
-    else:
-        label += str(minute)
-    label += ':'
-    if second < 10:
-        label += '0' + str(second)
-    else:
-        label += str(second)
-    return label
 
 class LoggingWindow(QWidget):
     def __init__(self, ui_file, parent=None):
@@ -45,6 +32,8 @@ class LoggingWindow(QWidget):
 
         self.btn_login:QPushButton = self.logging_window.findChild(QPushButton, 'btn_login')
         self.btn_settings_name_edit:QPushButton = self.logging_window.findChild(QPushButton, 'btn_settings_name_edit')
+        btn_statistics:QPushButton = self.logging_window.findChild(QPushButton, 'btn_statistics')
+        btn_statistics.clicked.connect(lambda: print('a'))
 
         self.slider_time:QSlider = self.logging_window.findChild(QSlider, 'slider_time')
         self.le_username = self.logging_window.findChild(QLineEdit, 'le_username')
@@ -118,7 +107,6 @@ class LoggingWindow(QWidget):
         path = user_dir.replace('\\', '/')+'/'+file_name
         self.write_user_path(user_name, path)
         self.lb_login_status.setPixmap(QPixmap.fromImage('icons/login_okay.png'))
-        #self.lb_login_status.repaint()
 
     def load_settings(self, default=False):
         xml_path = (os.getcwd()+'/settings/default_settings.xml').replace('\\', '/')
@@ -193,7 +181,8 @@ class LoggingWindow(QWidget):
 
 
 class MainGame(QMainWindow):
-    def __init__(self, ui_file, parent=None):
+
+    def init_global_fields(self):
         self.user_name = ''
         self.user_settings = dict()
         self.game_time = 0
@@ -203,6 +192,12 @@ class MainGame(QMainWindow):
         self.actions_queue = queue.Queue()
         self.current_combination = list()
         self.action_name = ''
+
+        self.stat_session = None
+
+    def __init__(self, ui_file, parent=None):
+
+        self.init_global_fields()
 
         super(MainGame, self).__init__(parent)
         ui_file = QFile(ui_file)
@@ -232,10 +227,12 @@ class MainGame(QMainWindow):
         self.btn_skip.clicked.connect(self.skip)
         self.btn_clear.clicked.connect(self.reset)
 
+        undo_shortcut = QShortcut(QKeySequence("Ctrl+Z"), self.window)
+        undo_shortcut.activated.connect(lambda: self.undo_action())
+
         self.window.installEventFilter(self)
         self.window.adjustSize()
         self.window.setWindowTitle('{} Game'.format(GlobalParams.application_name))
-       # self.window.setWindowIcon(GlobalParams.application_icon)
 
         self.logging_window = LoggingWindow('ui\LoggingDialog.ui')
         self.logging_window.btn_login.clicked.connect(self.login_in_game)
@@ -264,7 +261,7 @@ class MainGame(QMainWindow):
         self.game_time = int(self.logging_window.le_game_time.text())*60000
         self.user_settings = SettingsParser.parse_to_key_combination(self.logging_window.settings_path)
 
-        self.logging_window.close()
+        self.logging_window.hide()
         self.window.show()
         self.show_start_countdown_dialog()
 
@@ -273,6 +270,8 @@ class MainGame(QMainWindow):
         self.label_timer.setText(form_timer_label(cur_time.minute, cur_time.second))
         self.global_timer.start(self.game_time)
         self.second_timer.start(1000)
+
+        self.stat_session = SessionStat(self.user_name, self.game_time, self)
 
         queue_size = math.trunc((self.game_time/60000)*2)
         self.build_action_queue(queue_size)
@@ -305,6 +304,7 @@ class MainGame(QMainWindow):
             if self.game_step+1 == last_key_pos and role:
                 self.solved = True
                 self.insert_key_to_log('Решено! Нажмите любую клавишу, чтобы продолжить.', True)
+                self.stat_session.solve()
         elif self.solved:
             self.next_combination()
             return
@@ -335,23 +335,19 @@ class MainGame(QMainWindow):
         countdown_timer.start(1000)
         msg_box.exec_()
 
-    def get_last_key(self):
-        full_log = self.log.toPlainText().split('\n')
-        try:
-            return full_log[-2]
-        except IndexError:
-            return ''
-
     def skip(self):
+        self.stat_session.skip()
         self.actions_queue.put(self.action_name)
         self.next_combination()
 
     def reset(self):
+        self.stat_session.reset()
         self.game_step = 0
         self.log.clear()
 
     def undo_action(self):
         if self.game_step > 0:
+            self.stat_session.reset()
             self.game_step -= 1
             self.log.undo()
             self.scroll_log_to_max()
@@ -375,6 +371,7 @@ class MainGame(QMainWindow):
         self.label_timer.setText(form_timer_label(cur_time.minute, cur_time.second))
 
     def stop_game(self):
+        self.stat_session.finish_game(self.global_timer.remainingTime())
         self.global_timer.stop()
         self.second_timer.stop()
 
@@ -382,6 +379,7 @@ class MainGame(QMainWindow):
         if role:
             self.log.appendHtml('<font color="#1cb845">{}</font>'.format(key))
         else:
+            self.stat_session.make_mistake()
             self.log.appendHtml('<font color="#cf0a0a">{}</font>'.format(key))
 
     def build_action_queue(self, quantity):
@@ -429,4 +427,4 @@ def main():
 if __name__ == '__main__':
     main()
 
-# ['L', 'ML', '3', '0', 'TAB', '3', '5', 'ML', 'EN']
+'''pyinstaller --noconfirm --onedir --noconsole --add-data "D:/PycharmProjects/KnowledgeCoil/users;users/" --add-data "D:/PycharmProjects/KnowledgeCoil/ui;ui/" --add-data "D:/PycharmProjects/KnowledgeCoil/settings;settings/" --add-data "D:/PycharmProjects/KnowledgeCoil/icons;icons/" --add-data "D:/PycharmProjects/KnowledgeCoil/actions;actions/"  ""'''

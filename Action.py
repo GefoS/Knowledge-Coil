@@ -53,7 +53,14 @@ class KeyAction:
 
 if __name__ == '__main__':
     lebanon_settings = SettingsParser.parse_to_key_combination('users/lebanon/default_settings.xml')
+    for k, v in lebanon_settings.items():
+        if len(v) > 4:
+            print (k, v)
     levin_settings = SettingsParser.parse_to_key_combination('users/levin/levin.xml')
-    lebanon = KeyAction('actions/triangle_levin.csv', lebanon_settings)
-    levin = KeyAction('actions/triangle_default.csv', levin_settings)
+    for k, v in levin_settings.items():
+        if len(v) > 4:
+            print (k, v)
+
+    #lebanon = KeyAction('actions/triangle_levin.csv', lebanon_settings)
+    #levin = KeyAction('actions/triangle_default.csv', levin_settings)
     #print(levin.combination)

@@ -23,3 +23,17 @@ class KeyShortcuts:
     MOUSE_RIGHT = (Qt.MouseButton.RightButton, 'MouseRight', 'MR')
 
     reserved_shortcuts = [QKeySequence.New, QKeySequence.Undo, QKeySequence.Redo]
+
+
+def form_timer_label(minute, second):
+    label = ''
+    if minute < 10:
+        label += '0' + str(minute)
+    else:
+        label += str(minute)
+    label += ':'
+    if second < 10:
+        label += '0' + str(second)
+    else:
+        label += str(second)
+    return label

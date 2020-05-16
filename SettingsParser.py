@@ -4,24 +4,6 @@ from PySide2.QtCore import Qt
 from PySide2.QtGui import QKeySequence
 
 
-# def hex_to_sequence(keys):
-#     result = dict()
-#     for key, value in keys.items():
-#         if len(value) == 1:
-#             result[key] = QKeySequence(value)
-#         elif value.startswith('hex'):
-#             hex_keys = value[value.index(':')+1:]
-#             hex_split = hex_keys.split(',')
-#             full_key = hex_to_modifiers(hex_split[4])
-#             if full_key != -1:
-#                 full_key += int(hex_split[6], 16)
-#                 hex_split = QKeySequence(full_key)
-#             result[key] = hex_split
-#         else:
-#             result[key] = tuple(QKeySequence(ord(key)) for key in value)
-#     return result
-
-
 def hex_to_modifiers(hex_key):
     tab = {
         '09' : Qt.CTRL,
